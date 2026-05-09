@@ -11,6 +11,7 @@
     "@agentronics/gateway",
     "@agentronics/demo",
     "@agentronics/docs",
-    "@agentronics/dashboard"
+    "@agentronics/dashboard",
+    "@agentronics/e2e-getting-started"
   ]
 }
