@@ -1,0 +1,19 @@
+{
+  "name": "@agentronics/tsup-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "shared.js",
+  "types": "shared.d.ts",
+  "exports": {
+    ".": {
+      "types": "./shared.d.ts",
+      "import": "./shared.js",
+      "require": "./shared.js"
+    }
+  },
+  "files": ["shared.js", "shared.d.ts"],
+  "dependencies": {
+    "tsup": "^8.3.5"
+  }
+}

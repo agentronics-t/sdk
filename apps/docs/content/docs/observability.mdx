@@ -1,0 +1,76 @@
+---
+title: Observability
+description: How Agentronics records detection, auth, policy, memory, and tool traces.
+---
+
+# Observability
+
+The SDK records trace events for the governance decisions it makes in the browser. In v0.1 those traces stay local by default, so development works before the gateway routes exist. You can opt into console, webhook, or gateway export from `init()`.
+
+## Trace shape
+
+Every trace has stable routing fields plus optional context for the pillar that produced it.
+
+```ts
+{
+  id: 'trc_...',
+  siteId: 'shop-acme',
+  sessionId: 'ses_...',
+  occurredAt: '2026-04-28T10:00:00.000Z',
+  type: 'authz.evaluated',
+  outcome: 'success' | 'error' | 'blocked',
+  tool: 'cart.checkout',
+  agent: { class: 'webmcp', trust: 'detected', confidence: 1 },
+  policy: { decision: 'allow', ruleId: 'verified-checkout', reason: '...' },
+  metadata: {}
+}
+```
+
+Current event types include detection (`agent.detected`, `agent.missed`), identity (`auth.identity_presented`), authorization (`authz.evaluated`), and site memory (`memory.accessed`, `memory.updated`).
+
+## Reading local traces
+
+```ts
+const client = Agentronics.init({
+  siteId: 'shop-acme',
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+})
+
+await client.detect()
+const traces = client.traces()
+```
+
+The in-memory buffer keeps the newest 500 events by default. Set `trace.bufferSize` to tune that.
+
+## Exporters
+
+```ts
+const client = Agentronics.init({
+  siteId: 'shop-acme',
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+  trace: {
+    gateway: true,
+    webhookUrl: 'https://example.com/agentronics-webhook',
+    traceRate: 1,
+    errorRate: 1,
+  },
+})
+```
+
+`gateway: true` posts batches to `/v1/traces` with the publishable key. `webhookUrl` sends the same event payload to your endpoint with retry/backoff. `debug: true` also enables a console exporter.
+
+## PII scrub
+
+Trace metadata is scrubbed before it enters the buffer or exporters. Defaults redact `metadata.password`, `metadata.token`, `metadata.authorization`, and `metadata.cookie`.
+
+```ts
+Agentronics.init({
+  siteId: 'shop-acme',
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+  trace: {
+    scrubPaths: ['metadata.email', 'metadata.payment.cardNumber'],
+  },
+})
+```
+
+Scrubbing uses dot paths over JSON-serializable metadata. Keep raw secrets out of trace metadata whenever possible; scrubbers are a second line of defense.

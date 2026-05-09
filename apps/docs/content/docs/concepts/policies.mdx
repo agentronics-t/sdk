@@ -1,0 +1,29 @@
+---
+title: Policies
+description: Authorization policies and rate limits.
+---
+
+# Policies
+
+Policies map an agent identity and tool name to `allow`, `deny`, or `review`.
+
+```ts
+client.setPolicies([
+  {
+    id: 'verified-checkout',
+    tool: 'cart.checkout',
+    minTrust: 'verified',
+    allowedClasses: [],
+    decision: 'allow',
+    rateLimit: { max: 20, windowSeconds: 60 },
+  },
+])
+```
+
+For DOM and screenshot agents, annotate controls with `data-agentronics-tool` and install the DOM enforcer:
+
+```tsx
+client.installDomEnforcer()
+
+<button data-agentronics-tool="cart.checkout">Checkout</button>
+```

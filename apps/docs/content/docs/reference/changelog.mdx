@@ -1,0 +1,53 @@
+---
+title: Changelog
+description: Release notes for every published Agentronics package.
+---
+
+# Changelog
+
+This page is regenerated from [Changesets](https://github.com/changesets/changesets) on every release. The latest entry sits at the top.
+
+## v0.1.0 — 2026-05-09
+
+The first publishable Agentronics release. Everything documented under [Concepts](/docs/concepts/three-agent-classes) and [Reference](/docs/reference/configuration) is live in this version.
+
+### `@agentronics/sdk`
+
+- Six pillars wired through a single `Agentronics.init({...})` call: detection, auth normalization, authorization, site memory, observability, and tool management.
+- Three bundle entrypoints — full (`@agentronics/sdk`, ≤ 30 KB brotli), lite (`@agentronics/sdk/lite`, ≤ 8 KB brotli), and a tree-shake probe enforced by `pnpm size` in CI.
+- Detection covers WebMCP-native (Gemini), DOM-based (Claude Chrome, Operator, Comet), and screenshot-based agent classes with a confidence-scored signal stack.
+- `installDomEnforcer()` blocks denied DOM interactions and renders the deny overlay (`[data-agentronics-deny-overlay]`).
+- Site memory ships through `<meta>` tags, an overlay, the gateway-served well-known endpoint, and a synthetic WebMCP `getSiteContext` tool.
+- The trace pipeline includes console, gateway, and webhook exporters with rate sampling and PII scrubbing.
+
+### `@agentronics/react`
+
+- `<AgentronicsProvider>`, `useGovernedTool`, `useAgentContext`, `useSiteMemory` — built on `useSyncExternalStore` against the SDK's subscribe/snapshot stores.
+- Bundle ≤ 2 KB brotli (currently 526 B).
+
+### `@agentronics/protocol`
+
+- Zod schemas + TypeScript types for every wire DTO consumed by the SDK, gateway, and dashboard. Pinned to the SDK release.
+
+### `@agentronics/gateway` *(internal)*
+
+- Hono service with Clerk + API-key auth, rate limiting, security headers, and a multi-tenant in-memory adapter.
+- Routes: `/v1/policies`, `/v1/memory`, `/v1/signatures`, `/v1/traces`, `/v1/api-keys`, `/v1/metrics`, `/v1/audit/export`, `/v1/webhooks`.
+- Free-tier quota enforcement (1,000 governed tool calls/month → 429 `quota_exceeded`).
+- Background jobs for webhook dispatch and trace compaction, gated behind `x-cron-secret`.
+
+### Dashboard *(out-of-repo deploy)*
+
+- Five routes: overview, live feed (2 s polling), traces (cursor pagination + filters), API keys (issue + revoke), settings (quota + webhooks).
+- Demo-mode fallback when Clerk env vars are absent so previews build without secrets.
+
+### CI + tooling
+
+- 105 SDK tests, 7 React tests, 40 gateway tests, 5 Playwright scenarios. CI gate at `.github/workflows/e2e.yml`.
+- `pnpm sync-readme` regenerates per-package READMEs from the docs MDX before release.
+
+### Known deferrals
+
+- **Pillar 7 (Payments)** — design landed in `SDK_PLAN.md`, implementation slated for Q4 2026.
+- **Postgres adapter** — schema is committed; the in-memory adapter ships in this release. Production `DATABASE_URL` wiring lives in the gateway deploy artifact.
+- **Self-hosted gateway** — not supported. The managed gateway is the only deployment target.

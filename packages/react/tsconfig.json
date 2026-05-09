@@ -1,0 +1,7 @@
+{
+  "extends": "@agentronics/tsconfig/react.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "outDir": "dist"
+  }
+}

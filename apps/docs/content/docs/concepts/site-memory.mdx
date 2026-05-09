@@ -1,0 +1,89 @@
+---
+title: Site memory
+description: Enterprise-provided context delivered to every agent class.
+---
+
+# Site memory
+
+Site memory is the structured context your enterprise hands to agents — page map, workflows, business policies, UI guidance, per-page state. The point: agents stop screenshotting their way through your site.
+
+This is **not** the agent's own memory. Conversation history belongs to the agent. Site memory belongs to you.
+
+## Provide it once
+
+```ts
+client.provideSiteMemory({
+  siteMap: {
+    pages: [
+      { path: '/', name: 'Home', purpose: 'Featured products' },
+      { path: '/cart', name: 'Cart', availableActions: ['proceedToCheckout'] },
+      { path: '/checkout', name: 'Checkout', prerequisites: ['Cart must not be empty'] },
+    ],
+    navigation: { flow: 'Home → Cart → Checkout', pattern: 'linear' },
+  },
+  workflows: {
+    purchase: {
+      steps: [
+        { step: 1, action: 'Add items to cart' },
+        { step: 2, action: 'Review cart' },
+        { step: 3, action: 'Checkout' },
+      ],
+      notes: 'User confirmation required at step 3.',
+    },
+  },
+  policies: {
+    shipping: 'Free over $50',
+    returns: '30-day window',
+  },
+  uiGuidance: {
+    addToCart: { selector: '.add-to-cart-btn', behavior: 'Click to add 1 unit' },
+    checkout: { selector: '#proceed-checkout', location: 'Right sidebar of /cart' },
+  },
+})
+```
+
+`provideSiteMemory` merges keys, so partial updates do not nuke siblings. Use `client.siteMemory.update('policies.shipping', '...')` to overwrite a single dot-path.
+
+## Per-page context
+
+Pages with dynamic state (a checkout that knows the cart total, a search page that knows the active filter) can override their slice without rewriting the whole snapshot.
+
+```ts
+client.provideForPage({
+  path: '/checkout',
+  payload: {
+    currentStep: 'order-review',
+    estimatedTotal: 49.99,
+    requiredFields: ['shipping-address', 'payment-method'],
+  },
+})
+```
+
+Page contexts ride alongside the global snapshot. WebMCP and well-known clients can pull `pageContexts['/checkout']` to read the live state.
+
+## Four delivery channels
+
+Different agent classes consume site memory differently. The SDK ships all four channels — pick the ones that match the agents you care about.
+
+| Channel | Best for | API |
+|---|---|---|
+| WebMCP synthetic tool | WebMCP-native agents | `createWebMcpContextTool({ getSnapshot })` |
+| `<meta>` + JSON-LD | DOM agents, search engines | `client.installMemoryDelivery({ metaTags: true })` |
+| Visual overlay | Screenshot agents | `client.installMemoryDelivery({ overlay: true })` |
+| `/.well-known/agent-context.json` | Anything, no SDK | `serializeWellKnownContext({ snapshot })` on the host |
+
+The well-known endpoint is the universal fallback — like `robots.txt` for AI agents. Agentronics serves it through the gateway; production hosts proxy from their domain.
+
+## Gateway sync
+
+Site memory authored in the dashboard syncs into the browser SDK on demand:
+
+```ts
+await client.syncSiteMemory()
+```
+
+The SDK keeps an ETag, so subsequent syncs are 304s with no payload.
+
+## Traces
+
+Every `provide`, `update`, `provideForPage`, and gateway/well-known sync emits a `memory.updated` trace tagged with `metadata.kind === 'site'`. Reads through `siteMemory.get()` and the WebMCP tool emit `memory.accessed`. Use those to see exactly what agents pull from you.

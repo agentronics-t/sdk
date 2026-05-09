@@ -1,0 +1,36 @@
+---
+title: Policy Cookbook
+description: Common authorization policy patterns.
+---
+
+# Policy Cookbook
+
+## Read-only Browsing
+
+```ts
+{ id: 'browse', tool: 'catalog.*', minTrust: 'detected', allowedClasses: [], decision: 'allow' }
+```
+
+## Verified Checkout
+
+```ts
+{ id: 'checkout', tool: 'cart.checkout', minTrust: 'verified', allowedClasses: [], decision: 'allow' }
+```
+
+## Linked Account Actions
+
+```ts
+{ id: 'account', tool: 'account.*', minTrust: 'linked', allowedClasses: [], decision: 'allow' }
+```
+
+## Internal Agent Allowlist
+
+```ts
+{ id: 'internal', tool: 'admin.*', minTrust: 'verified', allowedClasses: ['webmcp'], decision: 'allow' }
+```
+
+## Tiered Rate Limits
+
+```ts
+{ id: 'cart-rate', tool: 'cart.*', minTrust: 'declared', allowedClasses: [], decision: 'allow', rateLimit: { max: 20, windowSeconds: 60 } }
+```

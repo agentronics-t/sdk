@@ -1,0 +1,101 @@
+---
+title: Authorization
+description: Per-tool policies that map agent identities to allow / deny / review decisions.
+---
+
+# Authorization
+
+Detection tells you what the agent is. Authentication tells you who it is. **Authorization tells you what it's allowed to do.**
+
+The SDK ships a synchronous policy engine that evaluates a list of rules against the current identity for a given tool name and returns one of three decisions:
+
+| Decision | When to use it |
+|---|---|
+| `allow` | Run the tool, no extra UX. |
+| `deny`  | Block the tool. Return an explanatory error to the agent. |
+| `review` | Run the tool but flag the action for human review (default when no rule matches). |
+
+## Defining policies
+
+A `PolicyRule` is a JSON object. Rules are evaluated in order; the first matching rule wins.
+
+```ts
+import type { PolicyRule } from '@agentronics/protocol'
+
+const policies: PolicyRule[] = [
+  {
+    id: 'verified-can-checkout',
+    tool: 'cart.checkout',
+    minTrust: 'verified',
+    allowedClasses: [],
+    decision: 'allow',
+  },
+  {
+    id: 'declared-can-browse',
+    tool: 'cart.*',
+    minTrust: 'declared',
+    allowedClasses: [],
+    decision: 'allow',
+    rateLimit: { max: 20, windowSeconds: 60 },
+  },
+  {
+    id: 'block-admin',
+    tool: 'admin.*',
+    minTrust: 'linked',
+    allowedClasses: ['webmcp'],
+    decision: 'deny',
+  },
+]
+```
+
+- **`tool`** — exact match, or a glob with `*` (`cart.*`, `admin.*`, or just `*`).
+- **`minTrust`** — agent must be at this trust level or higher (`detected < declared < verified < linked`).
+- **`allowedClasses`** — if non-empty, the agent's class must be in this list. Leave empty to allow any class.
+- **`decision`** — what the engine returns when a rule matches and the identity passes both trust and class checks. If trust or class fail, the engine always returns `deny` and tells you why.
+- **`rateLimit`** — optional token bucket applied after trust/class pass.
+
+## Loading policies and evaluating tools
+
+```ts
+import { Agentronics } from '@agentronics/sdk'
+
+const client = Agentronics.init({
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+  policies,
+})
+
+const decision = await client.evaluate('cart.checkout')
+// → { decision: 'allow' | 'deny' | 'review', ruleId: string | null, reason: string }
+
+if (decision.decision === 'deny') {
+  return new Response(JSON.stringify({ error: decision.reason }), { status: 403 })
+}
+```
+
+Pass `policies` to `init()` to seed them, or call `client.setPolicies(rules)` later to replace them. `client.listPolicies()` returns the current set.
+
+When the gateway is available, `client.syncPolicies()` fetches `/v1/sites/:siteId/policies` with ETag caching and replaces the local rule set.
+
+## DOM enforcement
+
+For DOM-driven and screenshot agents, annotate high-risk controls with a tool name and install the capture-phase enforcer:
+
+```tsx
+client.installDomEnforcer()
+
+<button data-agentronics-tool="cart.checkout">
+  Checkout
+</button>
+```
+
+Denied clicks are cancelled and a short visible overlay explains why the action was blocked. This is intentionally small browser-side enforcement; server-side authorization should still protect real mutations.
+
+## Default behaviour
+
+If no rule matches a tool name, the engine returns `review` with `ruleId: null`. That's the safe middle ground — your code can choose to allow, deny, or escalate to a human depending on the tool.
+
+If a rule matches but the identity is missing or below `minTrust`, the engine returns `deny` and the `reason` explains which constraint failed. That makes "why was this blocked?" easy to answer in the dashboard (Phase 8).
+
+## What's deferred to the gateway
+
+For v0.1, policies live entirely in the customer's code (passed to `init()`). When the gateway lands in Phase 8, policies will sync from the dashboard so non-engineers can edit them and roll out changes without a deploy. The protocol DTOs and engine surface stay the same.

@@ -1,0 +1,24 @@
+---
+title: Trust Levels
+description: How Agentronics moves from detection to linked user trust.
+---
+
+# Trust Levels
+
+The trust ladder is ordered:
+
+| Trust | Meaning |
+|---|---|
+| `detected` | Signals indicate an agent, but no identity proof exists. |
+| `declared` | The agent identified itself. |
+| `verified` | A token or proof was verified. |
+| `linked` | The verified agent is linked to a known user account. |
+
+```ts
+const identity = await client.authenticate({
+  sessionLinkToken: 'ses_...',
+  linkedUserId: 'user_123',
+})
+```
+
+When multiple auth methods produce identities, the SDK keeps the highest-trust result.

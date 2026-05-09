@@ -1,0 +1,15 @@
+node_modules
+dist
+.next
+.turbo
+.vercel
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+.DS_Store
+*.log
+.vscode
+.idea
+coverage
+.changeset/*-changeset-bot-*.md

@@ -1,0 +1,151 @@
+---
+title: Site memory cookbook
+description: Patterns for structuring site memory across common verticals.
+---
+
+# Site memory cookbook
+
+Five patterns to copy. Each is the smallest snapshot that makes agents fast on a real site.
+
+## 1. E-commerce store
+
+```ts
+client.provideSiteMemory({
+  siteMap: {
+    pages: [
+      { path: '/', name: 'Home', purpose: 'Featured products + search' },
+      { path: '/search', name: 'Search', queryParams: { q: 'search keyword' } },
+      { path: '/product/:id', name: 'Product detail' },
+      { path: '/cart', name: 'Cart', availableActions: ['updateQuantity', 'proceedToCheckout'] },
+      { path: '/checkout', name: 'Checkout', prerequisites: ['Cart must not be empty'] },
+    ],
+    navigation: { flow: 'Home → Search → Product → Cart → Checkout' },
+  },
+  workflows: {
+    purchase: {
+      steps: [
+        { step: 1, action: 'Search or browse' },
+        { step: 2, action: 'Add to cart' },
+        { step: 3, action: 'Review and place order' },
+      ],
+    },
+    returns: {
+      steps: [
+        { step: 1, action: 'Open Orders' },
+        { step: 2, action: 'Click Return Item, choose reason, print label' },
+      ],
+      policy: '30-day window',
+    },
+  },
+  policies: {
+    shipping: 'Free over $50',
+    returns: '30-day window, free return shipping',
+    agentRules: [
+      'Do not auto-purchase items over $500 without explicit user confirmation',
+      'Maximum 10 of any single item per order',
+    ],
+  },
+  catalog: {
+    categories: ['Electronics', 'Books', 'Home & Kitchen'],
+    productSchema: { fields: ['id', 'name', 'price', 'category', 'rating'] },
+    searchBehavior: 'Case-insensitive partial match on name + description',
+  },
+  uiGuidance: {
+    searchBar: { selector: '#search-bar', behavior: 'Type query and press Enter' },
+    addToCart: { selector: '.add-to-cart-btn', behavior: 'Click to add 1 unit' },
+    checkout: { selector: '#proceed-checkout', location: 'Cart page right sidebar' },
+  },
+})
+```
+
+## 2. SaaS dashboard
+
+```ts
+client.provideSiteMemory({
+  siteMap: {
+    pages: [
+      { path: '/inbox', name: 'Inbox', availableActions: ['filter', 'archive', 'reply'] },
+      { path: '/reports/:id', name: 'Report', availableActions: ['export', 'share'] },
+      { path: '/settings', name: 'Settings', notes: 'Admin-only sections require linked trust.' },
+    ],
+  },
+  policies: {
+    'admin-actions': 'Only agents with linked trust may modify settings.',
+    'export-formats': ['csv', 'json', 'pdf'],
+  },
+  uiGuidance: {
+    primaryNav: { selector: 'nav[aria-label="primary"]', location: 'left rail' },
+    contextualMenu: { selector: '[data-context-menu]', behavior: 'Right-click row to open' },
+  },
+})
+```
+
+## 3. Travel booking
+
+```ts
+client.provideSiteMemory({
+  workflows: {
+    bookFlight: {
+      steps: [
+        { step: 1, action: 'Pick origin + destination + dates' },
+        { step: 2, action: 'Choose flight, fare, and seats' },
+        { step: 3, action: 'Confirm passenger details and pay' },
+      ],
+      notes: 'Multi-passenger bookings require all passenger names before payment.',
+    },
+  },
+  policies: {
+    cancellation: '24h free cancellation; afterwards subject to fare rules',
+    agentRules: ['Do not change passenger name without explicit user approval'],
+  },
+})
+```
+
+## 4. Per-page live context
+
+Use `provideForPage` for state that changes between renders. Site-level memory stays static; per-page memory moves with the route.
+
+```ts
+function CheckoutPage({ cartTotal }: { cartTotal: number }) {
+  useEffect(() => {
+    client.provideForPage({
+      path: '/checkout',
+      payload: {
+        currentStep: 'order-review',
+        estimatedTotal: cartTotal,
+        requiredFields: ['shipping-address', 'payment-method'],
+      },
+    })
+  }, [cartTotal])
+}
+```
+
+## 5. Publishing the well-known endpoint
+
+Agentronics serves the well-known JSON via the gateway, but most enterprises expose it on their own domain so unsupported agents can fetch it without involving us.
+
+```ts
+import { serializeWellKnownContext } from '@agentronics/sdk'
+
+// Server-side route handler. Cache for 5 minutes; flush on dashboard write.
+export function GET() {
+  return new Response(
+    serializeWellKnownContext({ snapshot: latestSiteMemory }),
+    {
+      headers: {
+        'content-type': 'application/json',
+        'cache-control': 'public, max-age=300',
+      },
+    },
+  )
+}
+```
+
+Mount the handler at `/.well-known/agent-context.json`. Agents that find it can reason about your site in under a second.
+
+## When to choose what
+
+- Static, evergreen context → `provideSiteMemory` once at boot.
+- Dynamic per-route state → `provideForPage` on route change.
+- Gateway-authored content → `await client.syncSiteMemory()` on init.
+- Cross-platform agents that may not have an SDK → publish the well-known endpoint.

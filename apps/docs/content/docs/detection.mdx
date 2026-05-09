@@ -1,0 +1,62 @@
+---
+title: Detection
+description: How the Agentronics SDK identifies which kind of agent — if any — is on the page.
+---
+
+# Detection
+
+The SDK identifies three classes of agent. They are not symmetric — some are exact-match, some are heuristic, some are not detectable at all from the page. Being upfront about that asymmetry is the most important thing on this page.
+
+| Class | How we detect | Confidence |
+|---|---|---|
+| **WebMCP** | `navigator.modelContext` is set by the agent's browser/extension | Exact — `confidence: 1` |
+| **DOM-driver** | A weighted bag of automation signals (Playwright, Puppeteer, Selenium…) | Heuristic — `confidence: 0.0–1.0` |
+| **Screenshot model** | Cannot be detected client-side. Use `declareAgent()`. | Declared — `trust: 'declared' \| 'verified'` |
+
+## Running detection
+
+```ts
+import { Agentronics } from '@agentronics/sdk'
+
+const client = Agentronics.init({ publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY! })
+
+const identity = await client.detect()
+// → { class: 'webmcp', trust: 'detected', confidence: 1, vendor: 'claude-extension', … }
+// or null if no agent fires above threshold
+```
+
+`detect()` runs WebMCP first (with a short poll for late-injecting extensions), then falls back to DOM heuristics. The first class that matches wins.
+
+## Tuning
+
+```ts
+await client.detect({
+  webmcp: { pollMs: 500 },     // 0 to skip the poll, false to skip WebMCP entirely
+  dom:    { threshold: 0.4 },  // raise to be stricter, false to skip DOM heuristics
+})
+```
+
+## Agents declaring themselves
+
+Screenshot agents — and any agent that wants higher trust than detection alone provides — should call `declareAgent()`:
+
+```ts
+import { declareAgent } from '@agentronics/sdk'
+
+const id = declareAgent({
+  class: 'screenshot',
+  vendor: 'browser-use',
+  verificationToken: '<token from your verification endpoint>',
+})
+// → trust: 'verified' if a token is supplied, otherwise 'declared'
+```
+
+`verified` requires the gateway to validate the token against the customer's configured verification endpoint. That validation lands with the gateway in Phase 8.
+
+## What we deliberately do **not** do
+
+- **No fingerprinting beyond detection.** No canvas hashes, no audio context probes, no font enumeration.
+- **No silent retries to defeat anti-detection tooling.** If a sophisticated DOM-driver scrubs `navigator.webdriver`, it passes as human and that's the right answer for v0.1.
+- **No server-side header inspection in v0.1.** That belongs to a future edge product.
+
+See `research/phase-0.5-detection-spike.md` in the repo for the full methodology, signal weights, and decision log.

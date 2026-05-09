@@ -1,0 +1,80 @@
+---
+title: Getting Started
+description: Install the Agentronics SDK and govern your first agent action in five minutes.
+---
+
+# Getting Started
+
+This walkthrough assumes you have a Node 18+ project and a publishable API key (`agtx_pk_...`) from the Agentronics dashboard. If you do not have a key yet, sign up at [agentronics.dev](https://agentronics.dev) — the free tier is enough to follow along.
+
+### Step 1 — Install
+
+```bash
+npm install @agentronics/sdk
+# or: pnpm add @agentronics/sdk
+# or: yarn add @agentronics/sdk
+```
+
+If you only need WebMCP detection and want the smallest possible bundle, import the `lite` entry instead:
+
+```ts
+import { init } from '@agentronics/sdk/lite'
+```
+
+### Step 2 — Initialize in the browser
+
+Call `Agentronics.init` once, as early as possible in your app's client entry. Pass your **publishable** key — never your secret key.
+
+```ts
+import { Agentronics } from '@agentronics/sdk'
+
+const client = Agentronics.init({
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+  siteId: 'shop-acme-com',
+  trace: { gateway: true },
+})
+```
+
+The SDK will throw a clear error if you accidentally pass a secret key (`agtx_sk_...`), so leaks fail loud rather than silent. Setting `trace.gateway: true` wires the gateway exporter so traces show up in the dashboard's `/live` feed within ~2 seconds.
+
+### Step 3 — React: wrap your app
+
+If you use React, install the bindings and use the provider:
+
+```bash
+npm install @agentronics/react
+```
+
+```tsx
+import { AgentronicsProvider } from '@agentronics/react'
+
+export default function App({ children }) {
+  return (
+    <AgentronicsProvider publishableKey={process.env.NEXT_PUBLIC_AGENTRONICS_KEY!}>
+      {children}
+    </AgentronicsProvider>
+  )
+}
+```
+
+Then access the client from any component with `useAgentronics()`. The `useGovernedTool`, `useAgentContext`, and `useSiteMemory` hooks are also exported — see the [Next.js guide](/docs/guides/nextjs) for usage.
+
+### Step 4 — Confirm it is live
+
+Open your site, then open the Agentronics dashboard `/live` page. You should see your first session appear within ~2 seconds. If nothing shows up, double-check that:
+
+- the key starts with `agtx_pk_`,
+- the script runs on the client (not only at build time),
+- `trace.gateway: true` is set on `Agentronics.init`,
+- and your domain is in the gateway's `ALLOWED_ORIGINS`.
+
+### Step 5 — Next
+
+Once detection is working, continue to:
+
+- **[Authorization](/docs/authorization)** — declare which agents can call which tools.
+- **[Site Memory](/docs/concepts/site-memory)** — give agents structured context about your site.
+- **[Observability](/docs/observability)** — stream events into your own analytics.
+- **[Plain HTML / CDN](/docs/guides/plain-html)** — drop the SDK into a static page with one script tag.
+
+Each of those has its own guide in this docs site. Welcome to Agentronics.

@@ -1,0 +1,32 @@
+---
+title: Introduction
+description: What Agentronics is, who it is for, and the problem it solves.
+---
+
+# Introduction
+
+**Agentronics is a universal governance layer for agent-surfable websites.**
+
+Modern websites are no longer browsed only by humans. AI agents — Claude, ChatGPT, Perplexity, custom in-house agents — already navigate, click, and submit forms on behalf of users. Most sites have no way to tell an agent apart from a human, no way to declare which actions are safe for an agent to take, and no way to see what agents did after they left.
+
+Agentronics gives any website seven primitives, behind one SDK:
+
+1. **Detection** — identify which agent class is on the page (WebMCP, DOM-driver, screenshot model).
+2. **Authentication** — let agents present a verifiable identity, not just a user-agent string.
+3. **Authorization** — declare per-tool policies based on agent class and trust level.
+4. **Site Memory** — persist context across an agent's session so the user does not re-explain themselves.
+5. **Observability** — stream every agent action into a dashboard your team actually reads.
+6. **Tool Management** — register, version, and gate the tools an agent can call on your site.
+7. **Payments** — *(deferred to v0.2)* charge agents per action, settle to your account.
+
+## Who this is for
+
+- **Product engineers** at companies whose users are starting to ask for "agent support" on the marketing site, the dashboard, or the help center.
+- **Platform teams** standardizing how agents interact with internal tools across many properties.
+- **Indie builders** shipping agent-first products who want governance without writing it themselves.
+
+## What ships in v0.1
+
+The first release is Detection + Auth + Authz + Memory + Observability + Tool Management. Payments lands in v0.2 once the first six are stable in production for our design partners. See the [changelog](/docs/reference/changelog) for the full v0.1.0 inventory.
+
+Continue to [Getting Started](/docs/getting-started) to install the SDK in under five minutes.

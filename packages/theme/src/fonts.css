@@ -1,0 +1,5 @@
+/* Space Mono via Google Fonts. Use this in Vite-style apps and CSS-only
+ * surfaces; Next apps should prefer next/font/google for SSR safety and
+ * automatic preconnect, then assign the resulting CSS variable to
+ * `--font-sans` / `--font-mono`. */
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');

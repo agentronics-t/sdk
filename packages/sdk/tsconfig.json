@@ -1,0 +1,7 @@
+{
+  "extends": "@agentronics/tsconfig/browser.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "outDir": "dist"
+  }
+}

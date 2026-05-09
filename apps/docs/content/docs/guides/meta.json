@@ -1,0 +1,4 @@
+{
+  "title": "Guides",
+  "pages": ["policy-cookbook", "memory-cookbook", "nextjs", "vite-react", "plain-html", "migration-from-raw-webmcp"]
+}

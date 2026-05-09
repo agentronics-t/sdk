@@ -1,0 +1,24 @@
+---
+title: Three Agent Classes
+description: WebMCP, DOM-driver, and screenshot agents have different detection guarantees.
+---
+
+# Three Agent Classes
+
+Agentronics models agents by how they interact with the page:
+
+| Class | Interaction path | Detection confidence |
+|---|---|---|
+| `webmcp` | Structured tools through `navigator.modelContext` | Stable, exact signal when present |
+| `dom` | Browser automation over DOM/click/type APIs | Beta, heuristic confidence score |
+| `screenshot` | Pixel-level mouse and keyboard control | Not reliably detectable client-side |
+
+```ts
+const identity = await client.detect()
+
+if (identity?.class === 'webmcp') {
+  // Structured tool client.
+}
+```
+
+Screenshot agents should declare themselves with `presentIdentity()` or `authenticate()` if they need more trust than anonymous browsing.

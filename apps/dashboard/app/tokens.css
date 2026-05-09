@@ -1,0 +1,4 @@
+/* Re-export the canonical token sheet so existing dashboard styles that
+ * @import './tokens.css' keep resolving. The single source of truth lives
+ * in `@agentronics/theme/tokens.css` — edit there, not here. */
+@import '@agentronics/theme/tokens.css';

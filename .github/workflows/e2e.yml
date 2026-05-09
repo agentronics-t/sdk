@@ -1,0 +1,42 @@
+name: E2E
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  playwright:
+    name: Playwright (smoke gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.9'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build library packages
+        # The demo + dashboard + e2e fixture all import workspace dist/ output.
+        run: |
+          pnpm --filter @agentronics/protocol build
+          pnpm --filter @agentronics/sdk build
+          pnpm --filter @agentronics/react build
+      - name: Install Playwright browser
+        run: pnpm --filter @agentronics/demo exec playwright install --with-deps chromium
+      - name: Run Playwright smoke gate
+        run: pnpm --filter @agentronics/demo test:e2e
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/demo/test-results/**
+            apps/demo/playwright-report/**
+          if-no-files-found: ignore
+          retention-days: 7

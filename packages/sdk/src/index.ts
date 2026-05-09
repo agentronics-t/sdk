@@ -1,0 +1,198 @@
+import { init, type AgentronicsClient, type InitOptions } from './init.js'
+import {
+  declareAgent,
+  bundledDetectors,
+  createDetectorRegistry,
+  createSignatureLoader,
+  detectAgent,
+  detectDom,
+  detectWebMcp,
+  type DeclareAgentInput,
+  type DetectAgentOptions,
+  type DetectDomOptions,
+  type DetectWebMcpOptions,
+  type Detector,
+  type DetectorRegistry,
+  type DetectorStatus,
+  type DomSignalName,
+} from './detection/index.js'
+import {
+  createIdentityStore,
+  type IdentityStore,
+  type PresentIdentityOptions,
+  type PresentedIdentity,
+} from './auth/identity.js'
+import { createAuthEngine, type AuthEngine, type AuthInput, type AuthMethod } from './auth/engine.js'
+import {
+  createAgentContextStore,
+  type AgentContextStore,
+  type AgentContextSnapshot,
+  type AgentContextListener,
+} from './auth/agentContext.js'
+import { deriveTrustLevel, highestTrust } from './auth/trustLevel.js'
+import { createPolicyEngine, type PolicyEngine } from './authz/engine.js'
+import { createRateLimiter, type RateLimiter } from './authz/rateLimiter.js'
+import { createPolicyCache, type PolicyCache } from './authz/policyCache.js'
+import { installDomEnforcer } from './authz/domEnforcer.js'
+import { showDenyOverlay } from './authz/overlay.js'
+import { createMemoryStore, type MemoryStore } from './memory/store.js'
+import {
+  createSiteMemoryStore,
+  type SiteMemoryStore,
+  type SiteMemoryListener,
+  type ProvideForPageInput,
+} from './memory/siteMemory.js'
+import { createMemoryCache, type MemoryCache } from './memory/memoryCache.js'
+import {
+  createWebMcpContextTool,
+  installMetaTags,
+  installMemoryOverlay,
+  fetchWellKnownContext,
+  serializeWellKnownContext,
+  WELL_KNOWN_PATH,
+  type WebMcpContextTool,
+  type WebMcpContextOptions,
+} from './memory/delivery/index.js'
+import { createToolRegistry, type GovernedTool, type ToolRegistry } from './tools/registry.js'
+import {
+  decideSurfacing,
+  surfaceTools,
+  explainSurfacing,
+  type SurfacingContext,
+  type SurfacingDecision,
+} from './tools/surfacing.js'
+import {
+  groupTools,
+  listGroupNames,
+  DEFAULT_GROUP,
+  type ToolGroupSummary,
+} from './tools/groups.js'
+import {
+  createProgressionStore,
+  type ProgressionConfig,
+  type ProgressionStage,
+  type ProgressionStore,
+  type ProgressionTransition,
+} from './tools/progression.js'
+import {
+  estimateBudget,
+  estimateToolTokens,
+  type ToolTokenEstimate,
+  type TokenBudgetReport,
+} from './tools/tokenEstimate.js'
+import {
+  createWebMcpAdapter,
+  type WebMcpAdapter,
+  type WebMcpAdapterOptions,
+  type WebMcpToolDescriptor,
+  type WebMcpProvider,
+} from './tools/webmcpAdapter.js'
+import {
+  createTracer,
+  createTraceBuffer,
+  createConsoleExporter,
+  createGatewayExporter,
+  createWebhookExporter,
+  type TraceExporter,
+  type TraceInput,
+  type Tracer,
+} from './observability/index.js'
+
+export {
+  init,
+  declareAgent,
+  detectAgent,
+  detectDom,
+  detectWebMcp,
+  createDetectorRegistry,
+  bundledDetectors,
+  createSignatureLoader,
+  createIdentityStore,
+  createAuthEngine,
+  createAgentContextStore,
+  deriveTrustLevel,
+  highestTrust,
+  createPolicyEngine,
+  createRateLimiter,
+  createPolicyCache,
+  installDomEnforcer,
+  showDenyOverlay,
+  createToolRegistry,
+  decideSurfacing,
+  surfaceTools,
+  explainSurfacing,
+  groupTools,
+  listGroupNames,
+  DEFAULT_GROUP,
+  createProgressionStore,
+  estimateBudget,
+  estimateToolTokens,
+  createWebMcpAdapter,
+  createMemoryStore,
+  createSiteMemoryStore,
+  createMemoryCache,
+  createWebMcpContextTool,
+  installMetaTags,
+  installMemoryOverlay,
+  fetchWellKnownContext,
+  serializeWellKnownContext,
+  WELL_KNOWN_PATH,
+  createTracer,
+  createTraceBuffer,
+  createConsoleExporter,
+  createGatewayExporter,
+  createWebhookExporter,
+}
+export type {
+  AgentronicsClient,
+  AuthEngine,
+  AuthInput,
+  AuthMethod,
+  AgentContextStore,
+  AgentContextSnapshot,
+  AgentContextListener,
+  DeclareAgentInput,
+  DetectAgentOptions,
+  DetectDomOptions,
+  DetectWebMcpOptions,
+  DomSignalName,
+  IdentityStore,
+  InitOptions,
+  MemoryStore,
+  SiteMemoryStore,
+  SiteMemoryListener,
+  MemoryCache,
+  ProvideForPageInput,
+  WebMcpContextTool,
+  WebMcpContextOptions,
+  GovernedTool,
+  ToolRegistry,
+  SurfacingContext,
+  SurfacingDecision,
+  ToolGroupSummary,
+  ProgressionConfig,
+  ProgressionStage,
+  ProgressionStore,
+  ProgressionTransition,
+  ToolTokenEstimate,
+  TokenBudgetReport,
+  WebMcpAdapter,
+  WebMcpAdapterOptions,
+  WebMcpToolDescriptor,
+  WebMcpProvider,
+  PolicyEngine,
+  PolicyCache,
+  RateLimiter,
+  Detector,
+  DetectorRegistry,
+  DetectorStatus,
+  PresentIdentityOptions,
+  PresentedIdentity,
+  TraceExporter,
+  TraceInput,
+  Tracer,
+}
+
+export const Agentronics = { init, declareAgent, detectAgent }
+
+export const VERSION = '0.1.0'

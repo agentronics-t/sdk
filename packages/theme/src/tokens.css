@@ -1,0 +1,52 @@
+/* @agentronics/theme — canonical design tokens.
+ *
+ * Used by every Agentronics surface (docs / demo / dashboard / gateway-landing
+ * / SDK overlays). Locked palette per coding_plan.md Phase 10.1.
+ *
+ * Indigo primary, dark navy bg, Amber for the logomark and highlights only.
+ * Space Mono is the canonical typeface — load via the matching `fonts.css`.
+ *
+ * Dark-only by decision; do not re-introduce a `prefers-color-scheme: light`
+ * branch here — if a light theme is needed later add it as an explicit
+ * `[data-theme="light"]` override in the consuming app.
+ */
+
+:root {
+  /* Accent — used for primary buttons, links, focus rings, active state. */
+  --accent: #6366f1;
+  --accent-strong: #818cf8;
+  --accent-on: #07091a;
+
+  /* Highlight — reserved for the Agentronics logomark, eyebrow pills, and
+   * panel titles. Never body text. */
+  --highlight: #f59e0b;
+  --highlight-strong: #d97706;
+
+  /* Surfaces. */
+  --bg: #07091a;
+  --bg-elevated: #0d1028;
+  --bg-muted: #11152f;
+  --border: #1f2547;
+  --border-strong: #2c3360;
+
+  /* Typography colors. */
+  --text: #f4f4f5;
+  --text-muted: #a4a8c5;
+  --text-faint: #6b6f8e;
+
+  /* Semantic states. */
+  --danger: #f87171;
+  --success: #4ade80;
+  --warning: #fbbf24;
+
+  /* Shape + elevation. */
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* Type — Space Mono everywhere. Load via @agentronics/theme/fonts.css or a
+   * framework-native font loader (next/font/google for SSR). */
+  --font-sans: 'Space Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-mono: 'Space Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}

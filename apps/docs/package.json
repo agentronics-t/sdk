@@ -1,0 +1,31 @@
+{
+  "name": "@agentronics/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint",
+    "clean": "rm -rf .next .turbo .source"
+  },
+  "dependencies": {
+    "@agentronics/protocol": "workspace:*",
+    "@agentronics/theme": "workspace:*",
+    "fumadocs-core": "^14.6.0",
+    "fumadocs-mdx": "^11.1.2",
+    "fumadocs-ui": "^14.6.0",
+    "next": "^15.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@agentronics/tsconfig": "workspace:*",
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,88 @@
+---
+title: Authentication
+description: How agents present a verifiable identity, and how the trust ladder works.
+---
+
+# Authentication
+
+Detection tells you *what kind* of agent is on the page. Authentication tells you *which specific agent*. The SDK exposes `client.authenticate()` for protocol-specific credentials and keeps `client.presentIdentity()` as the simple self-declaration path for agents that can only identify themselves in page JavaScript.
+
+## The trust ladder
+
+| Trust | How it's reached | What customers should infer |
+|---|---|---|
+| `detected` | Heuristic signals fired (DOM-driver only) | "Probably an automation tool. Apply restrictive defaults." |
+| `declared` | Agent called `presentIdentity()` with a token, but the token has not been verified server-side | "Self-identified. Trust at your own risk." |
+| `verified` | The gateway validated the token against the agent vendor's verification endpoint | "Identity is real. Apply the agent's policy." |
+| `linked` | The verified agent has been linked to a known end-user account on your side | "Apply the user's permissions to the agent's actions." |
+
+Trust is monotonic from the SDK's perspective: `client.detect()` returns the **highest-trust identity** available, so a `verified` identity always wins over a `detected` one.
+
+## Presenting an identity
+
+```ts
+import { Agentronics } from '@agentronics/sdk'
+
+const client = Agentronics.init({ publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY! })
+
+client.presentIdentity({
+  class: 'screenshot',
+  vendor: 'browser-use',
+  token: '<token issued to your agent>',
+})
+
+const identity = await client.detect()
+// → { class: 'screenshot', trust: 'declared', vendor: 'browser-use', … }
+```
+
+The token is a string the agent obtained out of band — typically from its own backend. It is never validated by the SDK; that's the gateway's job (Phase 8). Until then, the SDK reports `trust: 'declared'`.
+
+## Authenticating protocol credentials
+
+The auth engine has a registry of seven methods:
+
+| Method | Input | Default trust |
+|---|---|---|
+| `detection` | A detected `AgentIdentity` | `detected` |
+| `selfDeclaration` | `declaration` claim | `declared` |
+| `bearer` | `bearerToken` | `verified` |
+| `xAgentHeader` | `xAgentHeader` (`vendor;class;proof`) | `declared` or `verified` |
+| `extensionToken` | `extensionToken` | `verified` |
+| `sessionLink` | `sessionLinkToken` + optional `linkedUserId` | `verified` or `linked` |
+| `oauth2` | `oauth2AccessToken` + optional subject | `verified` or `linked` |
+
+```ts
+const identity = await client.authenticate({
+  bearerToken: 'agt_bearer_...',
+  vendorHint: 'claude',
+  classHint: 'webmcp',
+})
+
+// Gateway-backed verification can override trust/vendor.
+const client = Agentronics.init({
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+  auth: {
+    verifyToken: async (method, token) => {
+      const result = await fetch('/api/agentronics/verify', {
+        method: 'POST',
+        body: JSON.stringify({ method, token }),
+      })
+      return result.ok ? result.json() : null
+    },
+  },
+})
+```
+
+When multiple methods produce identities, the engine returns the highest trust level. Every auth attempt emits a trace so dashboard history can explain how trust was assigned.
+
+## Clearing an identity
+
+When an agent hands the page back to a human, call `client.clearIdentity()` to forget the staged claim.
+
+## What customers see
+
+`detect()` returns `null` if no signal fires above threshold and no identity is presented. That's the "either a human or an undetectable agent" case — apply your default policy.
+
+## Verification (Phase 8 preview)
+
+When the gateway lands, presenting a token will trigger a `POST` to `/v1/verify` with a `VerificationChallenge`. The gateway forwards the claim to the vendor's verification endpoint, validates the response, and returns a signed `VerificationResult` that the SDK uses to upgrade the identity from `declared` to `verified`. The protocol DTOs already exist (`packages/protocol/src/auth.ts`); only the network plumbing is deferred.

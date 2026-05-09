@@ -1,0 +1,68 @@
+{
+  "name": "@agentronics/react",
+  "version": "0.1.0",
+  "description": "React bindings for the Agentronics SDK.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "size": "size-limit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "dependencies": {
+    "@agentronics/protocol": "workspace:*",
+    "@agentronics/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentronics/eslint-config": "workspace:*",
+    "@agentronics/tsconfig": "workspace:*",
+    "@agentronics/tsup-config": "workspace:*",
+    "@size-limit/preset-small-lib": "^11.1.6",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^18.3.12",
+    "happy-dom": "^15.11.7",
+    "react": "^18.3.1",
+    "size-limit": "^11.1.6",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "size-limit": [
+    {
+      "name": "react bindings (esm, gzipped)",
+      "path": "dist/index.js",
+      "ignore": [
+        "react",
+        "@agentronics/sdk",
+        "@agentronics/protocol"
+      ],
+      "limit": "2 KB"
+    }
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

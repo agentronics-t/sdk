@@ -1,0 +1,131 @@
+import type { AgentIdentity, PolicyEvaluation, PolicyRule } from '@agentronics/protocol'
+import type { TraceInput } from '../observability/tracer.js'
+
+export interface GovernedTool<Input = unknown, Output = unknown> {
+  name: string
+  version?: string
+  group?: string
+  description?: string
+  inputSchema?: Record<string, unknown>
+  stage?: string
+  authz?: Omit<PolicyRule, 'id' | 'tool'>
+  rateLimit?: PolicyRule['rateLimit']
+  execute: (input: Input, context: { identity: AgentIdentity | null }) => Promise<Output> | Output
+}
+
+export interface ToolRegistryOptions {
+  evaluate: (tool: string, options?: { identity?: AgentIdentity | null }) => Promise<PolicyEvaluation>
+  setPolicies?: (rules: PolicyRule[]) => void
+  listPolicies?: () => PolicyRule[]
+  onTrace?: (input: TraceInput) => void
+}
+
+export interface ToolRegistry {
+  register(tool: GovernedTool): () => void
+  unregister(name: string): void
+  enable(name: string): void
+  disable(name: string): void
+  isEnabled(name: string): boolean
+  list(options?: { includeDisabled?: boolean }): GovernedTool[]
+  get(name: string): GovernedTool | undefined
+  execute<Input, Output>(
+    name: string,
+    input: Input,
+    identity?: AgentIdentity | null
+  ): Promise<Output>
+}
+
+export const createToolRegistry = ({
+  evaluate,
+  setPolicies,
+  listPolicies,
+  onTrace,
+}: ToolRegistryOptions): ToolRegistry => {
+  const tools = new Map<string, GovernedTool>()
+  const disabled = new Set<string>()
+
+  const writePolicyFor = (tool: GovernedTool) => {
+    if (!tool.authz || !setPolicies || !listPolicies) return
+    const rule: PolicyRule = {
+      id: `tool:${tool.name}`,
+      tool: tool.name,
+      ...tool.authz,
+      rateLimit: tool.rateLimit ?? tool.authz.rateLimit,
+    }
+    setPolicies([...listPolicies().filter((item) => item.id !== rule.id), rule])
+  }
+
+  return {
+    register(tool) {
+      tools.set(tool.name, tool)
+      disabled.delete(tool.name)
+      writePolicyFor(tool)
+      onTrace?.({
+        type: 'tool.registered',
+        tool: tool.name,
+        metadata: {
+          version: tool.version ?? null,
+          group: tool.group ?? null,
+          stage: tool.stage ?? null,
+        },
+      })
+      return () => {
+        tools.delete(tool.name)
+        disabled.delete(tool.name)
+      }
+    },
+    unregister(name) {
+      tools.delete(name)
+      disabled.delete(name)
+    },
+    enable(name) {
+      if (!tools.has(name) || !disabled.has(name)) return
+      disabled.delete(name)
+      onTrace?.({
+        type: 'tool.surfaced',
+        tool: name,
+        metadata: { state: 'enabled' },
+      })
+    },
+    disable(name) {
+      if (!tools.has(name) || disabled.has(name)) return
+      disabled.add(name)
+      onTrace?.({
+        type: 'tool.surfaced',
+        tool: name,
+        metadata: { state: 'disabled' },
+      })
+    },
+    isEnabled: (name) => tools.has(name) && !disabled.has(name),
+    list({ includeDisabled = false } = {}) {
+      const all = [...tools.values()]
+      return includeDisabled ? all : all.filter((tool) => !disabled.has(tool.name))
+    },
+    get: (name) => tools.get(name),
+    async execute<Input, Output>(
+      name: string,
+      input: Input,
+      identity: AgentIdentity | null = null
+    ): Promise<Output> {
+      const tool = tools.get(name) as GovernedTool<Input, Output> | undefined
+      if (!tool) throw new Error(`Tool "${name}" is not registered.`)
+      if (disabled.has(name)) {
+        const policy: PolicyEvaluation = {
+          decision: 'deny',
+          ruleId: `tool:${name}`,
+          reason: 'Tool is disabled.',
+        }
+        onTrace?.({ type: 'tool.executed', tool: name, agent: identity, policy, outcome: 'blocked' })
+        throw new Error(policy.reason)
+      }
+      const policy = await evaluate(name, { identity })
+      if (policy.decision === 'deny') {
+        onTrace?.({ type: 'tool.executed', tool: name, agent: identity, policy, outcome: 'blocked' })
+        throw new Error(policy.reason)
+      }
+      const output = await tool.execute(input, { identity })
+      onTrace?.({ type: 'tool.executed', tool: name, agent: identity, policy, outcome: 'success' })
+      return output
+    },
+  }
+}

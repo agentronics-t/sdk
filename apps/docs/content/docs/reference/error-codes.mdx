@@ -1,0 +1,54 @@
+---
+title: Error codes
+description: Every error code the gateway returns and what it means.
+---
+
+# Error codes
+
+The gateway returns a JSON body with at minimum an `error` field on every non-2xx response. Codes are stable strings — the dashboard, the SDK's resilience layer, and your monitoring should switch on them.
+
+## Authentication & authorization
+
+| Code | HTTP | When |
+|---|---|---|
+| `unauthorized` | 401 | Missing or invalid `Authorization: Bearer …` header. |
+| `forbidden` | 403 | Right credential, wrong scope (e.g. publishable key on a write route, or cross-tenant read). |
+| `wrong_key_kind` | 400 | SDK init received an `agtx_sk_*` key in the browser. |
+| `invalid_api_key` | 400 | Key prefix doesn't match `agtx_pk_` or `agtx_sk_`. |
+
+## Validation
+
+| Code | HTTP | When |
+|---|---|---|
+| `invalid_body` | 400 | Request body failed the route's zod schema. Response includes `issues[]`. |
+| `invalid_query` | 400 | Query string parameter (e.g. `agentClass`) didn't match the expected shape. |
+| `not_found` | 404 | Site / org / resource doesn't exist. |
+
+## Quota & rate limits
+
+| Code | HTTP | When |
+|---|---|---|
+| `quota_exceeded` | 429 | Free-tier monthly limit reached (1,000 governed tool calls). Body: `{ count, limit }`. Reset at the next month rollover. |
+| `rate_limited` | 429 | Per-key or per-IP burst limit. Body: `{ max, windowSeconds }`. Honor the `Retry-After` header. |
+
+## Cron & internal
+
+| Code | HTTP | When |
+|---|---|---|
+| `cron_disabled` | 503 | A cron route was hit but `CRON_SECRET` is not configured on the gateway. |
+| `internal_error` | 500 | Unhandled exception. Body includes a sanitized `message`. |
+
+## Client-side (SDK)
+
+| Code | When |
+|---|---|
+| `wrong_key_kind` | `Agentronics.init()` received a secret key. |
+| `invalid_api_key` | Init received a key with no recognized prefix. |
+| `invalid_identity_claim` | `presentIdentity()` got a malformed claim. |
+
+## Conventions
+
+- Every gateway response that returns an `error` also returns a stable code in that field — string only, never localized.
+- 4xx errors carry actionable details (`issues`, `field`, `count/limit`). 5xx errors carry a sanitized `message` you can show to operators but not end users.
+- Rate-limit responses always include `Retry-After`. Quota responses include the current `count` and `limit` so dashboards can render a usage bar.
+- The `not_found` code never leaks tenant existence: cross-tenant reads return `forbidden`, not `not_found`.

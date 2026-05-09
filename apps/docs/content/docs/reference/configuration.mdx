@@ -1,0 +1,87 @@
+---
+title: Configuration
+description: Every option accepted by Agentronics.init, the AgentronicsClient surface, and the env vars consumed by the gateway.
+---
+
+# Configuration
+
+The browser SDK is configured with a single `Agentronics.init({...})` call. The gateway is configured with environment variables. Every option is documented below — anything not listed here is treated as forward-compatible noise and ignored.
+
+## `Agentronics.init(options)`
+
+```ts
+import { Agentronics } from '@agentronics/sdk'
+
+const client = Agentronics.init({
+  publishableKey: 'agtx_pk_live_…',
+  siteId: 'shop-acme-com',
+  gatewayUrl: 'https://gateway.agentronics.dev',
+  debug: false,
+  policies: [],
+  siteMemory: { /* … */ },
+  trace: { gateway: true },
+})
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `publishableKey` | `string` | *required* | Publishable key (`agtx_pk_*`). Secret keys (`agtx_sk_*`) throw `wrong_key_kind`. |
+| `siteId` | `string` | `'default'` | Stable identifier for this site — propagated onto every trace and gateway request. |
+| `gatewayUrl` | `string` | `'https://gateway.agentronics.dev'` | Override only for self-hosted enterprise gateways or local development. |
+| `debug` | `boolean` | `false` | Enables the console trace exporter and verbose warnings. |
+| `policies` | `PolicyRule[]` | `[]` | Seed the policy engine before the first `syncPolicies()` returns. |
+| `siteMemory` | `Partial<SiteMemory>` | — | Provide site context up-front; equivalent to calling `client.provideSiteMemory(...)` post-init. |
+| `auth` | `AuthContext` | — | Pre-configured auth providers (OAuth, session-link). |
+| `progression` | `ProgressionConfig` | — | Tool surfacing stages — see [Tool Management](/docs/concepts/tool-management). |
+| `tools` | `GovernedTool[]` | `[]` | Register tools synchronously instead of via `client.registerTool()`. |
+| `trace.enabled` | `boolean` | `true` | Master switch for the tracer. |
+| `trace.bufferSize` | `number` | `200` | In-memory ring buffer size before backpressure kicks in. |
+| `trace.traceRate` | `number` | `1.0` | Sampling rate for non-error traces (`0.0`–`1.0`). |
+| `trace.errorRate` | `number` | `1.0` | Sampling rate for error traces. |
+| `trace.scrubPaths` | `string[]` | `[]` | JSONPath-ish paths scrubbed before export. |
+| `trace.gateway` | `boolean` | `false` | Wire the gateway exporter (`POST /v1/traces`). |
+| `trace.webhookUrl` | `string` | — | Wire a webhook exporter for a custom sink. |
+| `trace.exporters` | `TraceExporter[]` | `[]` | Custom exporters appended to the pipeline. |
+
+## `AgentronicsClient`
+
+`init` returns a frozen client. The full type lives in `@agentronics/sdk`.
+
+```ts
+client.detect()                        // → AgentIdentity | null
+client.authenticate({ method, … })     // → AgentIdentity | null
+client.presentIdentity({ … })          // → PresentedIdentity
+client.evaluate('cart.add')            // → PolicyEvaluation
+client.syncPolicies()                  // → PolicyRule[] (from gateway)
+client.provideSiteMemory({ … })        // → SiteMemory
+client.registerTool({ name, … })       // → off()
+client.surfaceTools()                  // → GovernedTool[]
+client.installDomEnforcer()            // → { uninstall() }
+client.installMemoryDelivery()         // → { uninstall() }
+client.traces()                        // → TraceEvent[] (in-memory)
+```
+
+See `packages/sdk/src/init.ts` for the canonical signatures.
+
+## Gateway environment variables
+
+The gateway is operated by Agentronics. These variables are documented for the curious and for the local-development path used by the demo + Playwright suite.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8787` | HTTP listen port. |
+| `DATABASE_URL` | — | Postgres connection string. Unset = in-memory adapter (dev only). |
+| `ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:3001,http://localhost:3002` | Comma-separated CORS allowlist. |
+| `CRON_SECRET` | — | Required `x-cron-secret` for `/v1/cron/*` job endpoints. |
+| `SEED_FIXTURE` | `false` | When `true`, seeds the deterministic E2E fixture and installs a permissive `x-clerk-user` resolver. **Never set in production.** |
+| `LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error`. |
+
+## Bundle entrypoints
+
+| Import | What it ships | Budget |
+|---|---|---|
+| `@agentronics/sdk` | Full SDK — every pillar wired through `init()`. | ≤ 30 KB brotli |
+| `@agentronics/sdk/lite` | WebMCP-only `init` plus `detectWebMcp`. | ≤ 8 KB brotli |
+| `@agentronics/react` | Provider + hooks. Peer-deps on the SDK. | ≤ 2 KB brotli |
+
+The CI `pnpm size` run in `packages/sdk` enforces all three plus a tree-shake budget on the `Agentronics.init` reachable graph.

@@ -1,0 +1,112 @@
+---
+title: Tool management
+description: Surfacing strategy, groups, progression stages, trust-based filtering, and a token budget worked example.
+---
+
+# Tool management
+
+You probably have far more tools than any agent should see at once. Tool management is the layer that decides — given the current agent's trust, class, and where they are in your flow — which subset to expose.
+
+The point: agents stop thrashing through 60-tool menus. You ship one registry, the SDK decides what to surface.
+
+## Register tools
+
+```ts
+client.registerTool({
+  name: 'cart.add',
+  group: 'cart',
+  stage: 'browse',
+  description: 'Add an item to the cart.',
+  inputSchema: { type: 'object', properties: { itemId: { type: 'string' } } },
+  authz: { minTrust: 'declared', allowedClasses: [], decision: 'allow' },
+  rateLimit: { max: 3, windowSeconds: 60 },
+  execute: async (input, { identity }) => addItem(input, identity),
+})
+```
+
+`authz` is forwarded into the policy engine automatically — every governed tool produces a matching `tool:<name>` policy rule.
+
+## Surfacing
+
+`client.surfaceTools({ identity })` returns the visible subset for a given agent. The decision pipeline:
+
+1. **Trust floor.** Tool's `authz.minTrust` must be ≤ identity trust.
+2. **Allowed classes.** If `authz.allowedClasses` is non-empty, identity class must match.
+3. **Stage gate.** If the tool has a `stage`, it must be the current stage or in `enabledStages`.
+4. **Authz decision.** Tools whose authz `decision === 'deny'` never surface.
+
+`client.explainSurfacing({ identity })` returns the same call with a `reason` string per tool, useful for debugging in the dashboard.
+
+## Groups
+
+Every tool can declare a `group`. `client.groupedTools({ identity })` returns the surfaced subset bucketed by group, sorted alphabetically. Groups are presentational — they help WebMCP clients render menus, but never affect surfacing decisions.
+
+## Progression stages
+
+Stages model where a session is in your flow. A site that has `browse` and `checkout` stages surfaces different tools at each.
+
+```ts
+const client = init({
+  publishableKey,
+  progression: {
+    initial: 'browse',
+    stages: [
+      { name: 'browse', transitions: [{ on: 'cart.add', to: 'checkout' }] },
+      { name: 'checkout' },
+    ],
+  },
+  tools: [
+    { name: 'cart.add', stage: 'browse', /* ... */ },
+    { name: 'cart.checkout', stage: 'checkout', /* ... */ },
+  ],
+})
+
+// On a successful WebMCP invocation, the SDK auto-advances. From plain
+// JS callers, call `client.notifyToolInvoked('cart.add')` to nudge.
+```
+
+A stage transition emits `tool.progressed` with `{ from, to, trigger }` metadata. The next surfacing call sees the new stage.
+
+## WebMCP adapter
+
+`client.publishToWebMcp({ identity })` calls `navigator.modelContext.provideContext({ tools: [...] })` with the surfaced subset. Each tool's `invoke` runs through the registry's policy pipeline, so denies are still enforced even when called by a WebMCP-native agent.
+
+```ts
+client.publishToWebMcp({ identity: detected })
+```
+
+The adapter no-ops in environments where `navigator.modelContext` is missing (server-side, locked-down browsers).
+
+## Token budget
+
+Tool descriptions cost tokens — every surfaced tool occupies space in the agent's context. `client.estimateTokens({ identity })` returns:
+
+```ts
+{
+  total: 412,
+  perTool: [
+    { name: 'cart.add', characters: 168, tokens: 42 },
+    { name: 'cart.remove', characters: 132, tokens: 33 },
+    // ...
+  ],
+}
+```
+
+The estimate is `Math.ceil(JSON.stringify(descriptor).length / 4)` — a rough OpenAI-style rule of thumb. Use it to reject overlarge tool sets before publishing.
+
+### Worked example
+
+A retail site has 14 tools. For a `detected`-trust visitor, surfacing returns the 4 read-only ones (catalog search, catalog read, reviews read, shipping estimate), totaling ≈160 tokens. After the user signs in (`linked`), the same registry surfaces 12 of 14, totaling ≈480 tokens — still well under any reasonable model budget.
+
+If a tool inflates `description` or `inputSchema` beyond reason, it lights up in `perTool` as an outlier. Trim the description, or split a fat tool into two.
+
+## Traces
+
+| Event | When |
+|---|---|
+| `tool.registered` | A tool is added to the registry. |
+| `tool.surfaced` | Surfacing changes — `state` is `enabled`, `disabled`, or `published`. |
+| `tool.executed` | A tool runs — `outcome` is `success` or `blocked`. |
+| `tool.progressed` | A stage transition fires. |
+
+Filter for `tool.*` in the dashboard to watch the surfacing layer in real time.

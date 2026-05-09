@@ -1,0 +1,39 @@
+{
+  "name": "@agentronics/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agentronics control-plane API (Hono on Node).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@agentronics/protocol": "workspace:*",
+    "@agentronics/theme": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "@neondatabase/serverless": "^0.10.4",
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.6.13",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@agentronics/eslint-config": "workspace:*",
+    "@agentronics/sdk": "workspace:^",
+    "@agentronics/tsconfig": "workspace:*",
+    "@agentronics/tsup-config": "workspace:*",
+    "@types/node": "^22.10.1",
+    "drizzle-kit": "^0.28.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

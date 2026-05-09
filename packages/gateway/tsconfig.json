@@ -1,0 +1,7 @@
+{
+  "extends": "@agentronics/tsconfig/node.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "outDir": "dist"
+  }
+}

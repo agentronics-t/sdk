@@ -1,0 +1,67 @@
+{
+  "name": "@agentronics/sdk",
+  "version": "0.1.0",
+  "description": "Browser SDK for the Agentronics governance layer.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./lite": {
+      "types": "./dist/lite.d.ts",
+      "import": "./dist/lite.js",
+      "require": "./dist/lite.cjs"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "size": "size-limit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@agentronics/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentronics/eslint-config": "workspace:*",
+    "@agentronics/tsconfig": "workspace:*",
+    "@agentronics/tsup-config": "workspace:*",
+    "@size-limit/preset-small-lib": "^11.1.6",
+    "happy-dom": "^15.11.7",
+    "size-limit": "^11.1.6",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "size-limit": [
+    {
+      "name": "Agentronics.init reachable graph (esm, brotli)",
+      "path": "dist/init-only.js",
+      "limit": "25 KB"
+    },
+    {
+      "name": "lite (esm, gzipped)",
+      "path": "dist/lite.js",
+      "limit": "8 KB"
+    },
+    {
+      "name": "full (esm, gzipped)",
+      "path": "dist/index.js",
+      "limit": "30 KB"
+    }
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

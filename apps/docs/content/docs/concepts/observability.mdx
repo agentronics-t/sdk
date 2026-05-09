@@ -1,0 +1,28 @@
+---
+title: Observability
+description: Trace shape, exporters, and PII scrubbing.
+---
+
+# Observability
+
+Agentronics emits browser-side traces for detection, auth, authorization, memory, and tool events.
+
+```ts
+const traces = client.traces()
+```
+
+Exporters are configured at init:
+
+```ts
+Agentronics.init({
+  siteId: 'shop-acme',
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+  trace: {
+    gateway: true,
+    webhookUrl: 'https://example.com/agentronics-webhook',
+    scrubPaths: ['metadata.email', 'metadata.payment.cardNumber'],
+  },
+})
+```
+
+The webhook exporter retries failed sends and queues failed events in browser storage for the next successful delivery.

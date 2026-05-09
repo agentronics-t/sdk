@@ -1,0 +1,29 @@
+/* Override Fumadocs' default theme with the Agentronics palette + Space Mono.
+ * Affects every /docs/* page; the marketing landing has its own scoped CSS. */
+@import '@agentronics/theme/tokens.css';
+
+html,
+body {
+  font-family: var(--font-space-mono), var(--font-sans);
+}
+
+:root,
+.light,
+.dark {
+  --color-fd-background: 7 9 26; /* #07091A */
+  --color-fd-foreground: 244 244 245;
+  --color-fd-muted: 17 21 47; /* #11152F */
+  --color-fd-muted-foreground: 164 168 197;
+  --color-fd-popover: 13 16 40; /* #0D1028 */
+  --color-fd-popover-foreground: 244 244 245;
+  --color-fd-card: 13 16 40;
+  --color-fd-card-foreground: 244 244 245;
+  --color-fd-border: 31 37 71; /* #1F2547 */
+  --color-fd-primary: 99 102 241; /* #6366F1 */
+  --color-fd-primary-foreground: 7 9 26;
+  --color-fd-secondary: 17 21 47;
+  --color-fd-secondary-foreground: 244 244 245;
+  --color-fd-accent: 245 158 11; /* #F59E0B — used for highlights */
+  --color-fd-accent-foreground: 7 9 26;
+  --color-fd-ring: 99 102 241;
+}
