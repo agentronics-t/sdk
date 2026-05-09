@@ -96,4 +96,6 @@ The build plan, deployment runbook, detection spike, and append-only retrospecti
 
 ## License
 
-[MIT](./LICENSE)
+[Apache License 2.0](./LICENSE) for the SDK source code. See also [`NOTICE`](./NOTICE).
+
+The Agentronics gateway / control-plane backend is a separate, proprietary product and is not covered by this license. The SDK is designed to operate against `https://gateway.agentronics.dev/`; sign up at [agentronics.dev](https://agentronics.dev) to issue API keys.

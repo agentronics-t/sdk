@@ -2,7 +2,7 @@
   "name": "@agentronics/theme",
   "version": "0.1.0",
   "description": "Shared design tokens (CSS variables) and Space Mono font helpers for every Agentronics surface.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

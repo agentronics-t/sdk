@@ -2,7 +2,7 @@
   "name": "@agentronics/react",
   "version": "0.1.0",
   "description": "React bindings for the Agentronics SDK.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
