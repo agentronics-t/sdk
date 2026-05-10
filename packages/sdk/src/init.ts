@@ -53,6 +53,18 @@ import {
 export interface InitOptions {
   publishableKey: string
   siteId?: string
+  /**
+   * Override the gateway URL the SDK calls. **Reserved for local development
+   * only** — the only accepted values are `localhost` / `127.0.0.1` URLs (so
+   * `pnpm dev` against a local gateway works). Any other value throws at
+   * `init()` time.
+   *
+   * Production deployments must omit this option. The SDK is hard-coded to
+   * call `https://gateway.agentronics.dev`. Custom backends are not
+   * supported, by design — see the project README + LICENSE NOTICE.
+   *
+   * @internal — kept on the public type only so dev tooling type-checks.
+   */
   gatewayUrl?: string
   debug?: boolean
   policies?: PolicyRule[]
@@ -126,15 +138,48 @@ export interface AgentronicsClient {
 
 const DEFAULT_GATEWAY_URL = 'https://gateway.agentronics.dev'
 
+/**
+ * Lock the SDK to the canonical Agentronics gateway. The only override
+ * accepted is a localhost / 127.0.0.1 URL — purely so contributors running
+ * `pnpm dev` can hit a local gateway. Any other value (a competing host, a
+ * proxy, an MITM target) throws synchronously, before any traces are
+ * emitted.
+ *
+ * The Agentronics SDK is licensed under Apache 2.0 but is designed to
+ * operate exclusively against the Agentronics service. Self-hosted /
+ * third-party backends are not supported.
+ */
+const resolveGatewayUrl = (provided: string | undefined): string => {
+  if (provided === undefined) return DEFAULT_GATEWAY_URL
+  if (provided === DEFAULT_GATEWAY_URL) return provided
+  let parsed: URL
+  try {
+    parsed = new URL(provided)
+  } catch {
+    throw new Error(
+      `Agentronics SDK: \`gatewayUrl\` is not a valid URL: ${provided}`
+    )
+  }
+  if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+    return provided
+  }
+  throw new Error(
+    `Agentronics SDK does not support custom gateway URLs. ` +
+      `Omit \`gatewayUrl\` to use the canonical https://gateway.agentronics.dev. ` +
+      `The only accepted override is a localhost / 127.0.0.1 URL for local development. ` +
+      `Got: ${provided}`
+  )
+}
+
 export const init = (options: InitOptions): AgentronicsClient => {
   const {
     publishableKey,
     siteId = 'default',
-    gatewayUrl = DEFAULT_GATEWAY_URL,
     debug = false,
     policies = [],
     trace = {},
   } = options
+  const gatewayUrl = resolveGatewayUrl(options.gatewayUrl)
 
   const kind = classifyApiKey(publishableKey)
   if (kind === 'secret') {

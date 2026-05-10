@@ -20,6 +20,32 @@ describe('init', () => {
     expect(() => init({ publishableKey: 'nope_1234567890' })).toThrow(/agtx_pk_/)
   })
 
+  it('rejects a custom non-localhost gateway URL', () => {
+    expect(() =>
+      init({
+        publishableKey: 'agtx_pk_demo_1234567890',
+        gatewayUrl: 'https://evil.example.com',
+      })
+    ).toThrow(/does not support custom gateway URLs/)
+  })
+
+  it('rejects a malformed gateway URL', () => {
+    expect(() =>
+      init({
+        publishableKey: 'agtx_pk_demo_1234567890',
+        gatewayUrl: 'not a url',
+      })
+    ).toThrow(/not a valid URL/)
+  })
+
+  it('accepts http://localhost for local development', () => {
+    const client = init({
+      publishableKey: 'agtx_pk_demo_1234567890',
+      gatewayUrl: 'http://localhost:8787',
+    })
+    expect(client.gatewayUrl).toBe('http://localhost:8787')
+  })
+
   it('client.detect() returns null on a clean environment', async () => {
     const client = init({ publishableKey: 'agtx_pk_demo_1234567890' })
     const identity = await client.detect({ webmcp: { pollMs: 0 } })
