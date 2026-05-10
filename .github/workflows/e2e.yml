@@ -21,8 +21,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build library packages
-        # The demo + dashboard + e2e fixture all import workspace dist/ output.
+        # The demo + dashboard + e2e fixture import workspace dist/ output, and
+        # the gateway (started by Playwright's webServer) imports
+        # @agentronics/theme/dist at runtime via landing.ts.
         run: |
+          pnpm --filter @agentronics/theme build
           pnpm --filter @agentronics/protocol build
           pnpm --filter @agentronics/sdk build
           pnpm --filter @agentronics/react build
