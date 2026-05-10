@@ -20,15 +20,15 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build library packages
-        # The demo + dashboard + e2e fixture import workspace dist/ output, and
-        # the gateway (started by Playwright's webServer) imports
-        # @agentronics/theme/dist at runtime via landing.ts.
-        run: |
-          pnpm --filter @agentronics/theme build
-          pnpm --filter @agentronics/protocol build
-          pnpm --filter @agentronics/sdk build
-          pnpm --filter @agentronics/react build
+      - name: Build all workspace packages
+        # `pnpm -r build` (via turbo) builds every workspace package. We
+        # deliberately don't enumerate them — Playwright's webServer boots the
+        # gateway, which transitively pulls in any internal package that lives
+        # in @agentronics/*. Listing only "publishable" packages here was the
+        # trap that hid the missing @agentronics/theme build (see commit
+        # b5f4213). Slower by ~30-60s; immune to future "we forgot to add the
+        # new internal package" regressions.
+        run: pnpm -r build
       - name: Install Playwright browser
         run: pnpm --filter @agentronics/demo exec playwright install --with-deps chromium
       - name: Run Playwright smoke gate
