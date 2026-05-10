@@ -1,8 +1,24 @@
 name: Release
 
+# DISABLED until release infrastructure is in place. Re-enable by restoring
+# the `push` trigger below once these are configured:
+#   1. Repo settings → Actions → General → Workflow permissions:
+#      enable "Read and write" + "Allow GitHub Actions to create and
+#      approve pull requests" (required so changesets/action can open the
+#      "Version Packages" PR).
+#   2. npm Trusted Publisher set up on npmjs.com for @agentronics/protocol,
+#      @agentronics/sdk, @agentronics/react. See
+#      `apps/mds/sdk-coding-plan.md` §9 items 9–10 and
+#      `apps/mds/sdk-deploy-runbook.md` §4.
+#   3. GitHub environment `npm-publish` created in repo settings →
+#      Environments, with required reviewers (your handle).
+#
+# Until then, the workflow can still be triggered manually from the
+# Actions tab via "Run workflow" (workflow_dispatch).
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
 
 concurrency:
   group: release-${{ github.ref }}

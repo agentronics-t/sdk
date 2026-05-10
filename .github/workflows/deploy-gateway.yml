@@ -1,14 +1,25 @@
 name: Deploy gateway
 
+# DISABLED until Vercel infrastructure is in place. Re-enable by restoring
+# the `push` trigger below once these are configured:
+#   1. Vercel project for the gateway exists at gateway.agentronics.dev.
+#      See `apps/mds/sdk-deploy-runbook.md` §1.
+#   2. Repo secrets added in repo settings → Secrets and variables → Actions:
+#      VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_GATEWAY_PROJECT_ID.
+#   3. GitHub environment `production` created in repo settings →
+#      Environments (referenced by `environment: production` below).
+#
+# Until then, the workflow can still be triggered manually from the
+# Actions tab via "Run workflow" (workflow_dispatch).
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'packages/gateway/**'
-      - 'packages/protocol/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/deploy-gateway.yml'
   workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'packages/gateway/**'
+  #     - 'packages/protocol/**'
+  #     - 'pnpm-lock.yaml'
+  #     - '.github/workflows/deploy-gateway.yml'
 
 concurrency:
   group: deploy-gateway
