@@ -2,11 +2,14 @@ import { serve } from '@hono/node-server'
 import { createApp } from './app.js'
 import { loadEnv } from './env.js'
 import { createInMemoryStorage } from './storage/memory.js'
+import { createPostgresStorage } from './storage/postgres.js'
 import { seedFixture, DEMO_FIXTURE } from './storage/seed.js'
 import type { ClerkAuthOptions } from './middleware/clerkAuth.js'
 
 const env = loadEnv()
-const storage = createInMemoryStorage()
+const storage = env.DATABASE_URL
+  ? createPostgresStorage(env.DATABASE_URL)
+  : createInMemoryStorage()
 
 let resolveSession: ClerkAuthOptions['resolveSession'] | undefined
 if (env.SEED_FIXTURE) {

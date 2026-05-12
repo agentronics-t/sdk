@@ -8,10 +8,13 @@ import { verifyToken } from '@clerk/backend'
 import { createApp } from './app.js'
 import { loadEnv } from './env.js'
 import { createInMemoryStorage } from './storage/memory.js'
+import { createPostgresStorage } from './storage/postgres.js'
 import { seedFixture, DEMO_FIXTURE } from './storage/seed.js'
 
 const env = loadEnv()
-const storage = createInMemoryStorage()
+const storage = env.DATABASE_URL
+  ? createPostgresStorage(env.DATABASE_URL)
+  : createInMemoryStorage()
 
 // Real production session resolution: verify the Clerk session JWT in the
 // Authorization Bearer header against Clerk's JWKS. Returns null on any
