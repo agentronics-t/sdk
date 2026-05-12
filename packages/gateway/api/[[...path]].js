@@ -1,10 +1,12 @@
-// Vercel serverless entry. Wraps the same Hono `createApp()` used by the
-// long-running Node server (`src/server.ts`) and the Dockerfile, so the
-// route handlers are identical across runtimes. The `vercel.json` rewrite
-// at the gateway project root maps `/(.*)` -> `/api/$1`, which lands every
-// public URL on this catchall function. We then mount the inner Hono app
-// under `/api` so its native `/v1/*` routes resolve once Vercel strips the
-// rewrite prefix.
+// Vercel serverless entry. Plain .js so Vercel's @vercel/node builder
+// bundles via esbuild without running tsc on the gateway's TS sources --
+// tsup (esbuild) is the gateway's only type stripper today, and pulling
+// real tsc into the deploy path would surface unrelated strictness issues
+// that have nothing to do with serving requests.
+//
+// vercel.json rewrites /(.*) -> /api/$1, so every public URL lands on
+// this catchall. The inner Hono app is mounted under /api so its native
+// /v1/* routes resolve once the rewrite prefix is stripped.
 
 import { Hono } from 'hono'
 import { handle } from 'hono/vercel'
@@ -12,14 +14,13 @@ import { createApp } from '../src/app.js'
 import { loadEnv } from '../src/env.js'
 import { createInMemoryStorage } from '../src/storage/memory.js'
 import { seedFixture, DEMO_FIXTURE } from '../src/storage/seed.js'
-import type { ClerkAuthOptions } from '../src/middleware/clerkAuth.js'
 
 export const config = { runtime: 'nodejs' }
 
 const env = loadEnv()
 const storage = createInMemoryStorage()
 
-let resolveSession: ClerkAuthOptions['resolveSession'] | undefined
+let resolveSession
 if (env.SEED_FIXTURE) {
   await seedFixture(storage, DEMO_FIXTURE)
   resolveSession = async (headers) => {
