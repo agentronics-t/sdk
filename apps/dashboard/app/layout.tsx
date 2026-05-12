@@ -27,9 +27,11 @@ const isAuthRoute = (pathname: string): boolean =>
 const DashboardChrome = ({
   children,
   session,
+  clerkEnabled,
 }: {
   children: ReactNode
   session: DashboardSession
+  clerkEnabled: boolean
 }) => (
   <div style={{ display: 'flex', minHeight: '100vh' }}>
     <aside
@@ -85,7 +87,7 @@ const DashboardChrome = ({
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{session.orgName}</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 12, alignItems: 'center' }}>
           <span>{session.email}</span>
-          <UserMenu />
+          {clerkEnabled ? <UserMenu /> : null}
         </div>
       </header>
       <main style={{ padding: '1.5rem', flex: 1 }}>{children}</main>
@@ -118,7 +120,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           {onAuthRoute || !session ? (
             <AuthShell>{children}</AuthShell>
           ) : (
-            <DashboardChrome session={session}>{children}</DashboardChrome>
+            <DashboardChrome session={session} clerkEnabled={isClerkConfigured()}>
+              {children}
+            </DashboardChrome>
           )}
         </ClientProviders>
       </body>
