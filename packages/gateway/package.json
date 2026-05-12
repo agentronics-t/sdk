@@ -8,12 +8,13 @@
   "main": "./dist/server.js",
   "scripts": {
     "build": "tsup",
+    "build:vercel": "node scripts/build-vercel.mjs",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo .vercel/output"
   },
   "dependencies": {
     "@agentronics/protocol": "workspace:*",
@@ -31,6 +32,7 @@
     "@agentronics/tsup-config": "workspace:*",
     "@types/node": "^22.10.1",
     "drizzle-kit": "^0.28.1",
+    "esbuild": "^0.24.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
