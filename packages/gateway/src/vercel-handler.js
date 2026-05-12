@@ -4,6 +4,7 @@
 // original pathname preserved in `x-matched-path`.
 
 import { Buffer } from 'node:buffer'
+import { verifyToken } from '@clerk/backend'
 import { createApp } from './app.js'
 import { loadEnv } from './env.js'
 import { createInMemoryStorage } from './storage/memory.js'
@@ -12,14 +13,46 @@ import { seedFixture, DEMO_FIXTURE } from './storage/seed.js'
 const env = loadEnv()
 const storage = createInMemoryStorage()
 
-let resolveSession
-if (env.SEED_FIXTURE) {
-  await seedFixture(storage, DEMO_FIXTURE)
-  resolveSession = async (headers) => {
-    const userId = headers.get('x-clerk-user')
-    if (!userId) return null
-    return { userId, orgId: DEMO_FIXTURE.orgId }
+// Real production session resolution: verify the Clerk session JWT in the
+// Authorization Bearer header against Clerk's JWKS. Returns null on any
+// failure so the gateway's clerkAuth middleware emits 401. The dashboard
+// attaches the token via Clerk's getToken() before each gatewayFetch call.
+const clerkResolveSession = async (headers) => {
+  const authz = headers.get('authorization') || ''
+  if (!authz.toLowerCase().startsWith('bearer ')) return null
+  const token = authz.slice(7).trim()
+  if (!token) return null
+
+  try {
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    })
+    if (!payload?.sub) return null
+    const orgId = payload.org_id || payload.o?.id
+    if (!orgId) return null
+    return { userId: payload.sub, orgId }
+  } catch (err) {
+    console.error('[gateway] clerk verifyToken failed:', err?.message ?? err)
+    return null
   }
+}
+
+// Local-dev fallback used when SEED_FIXTURE=true is set (and only then).
+// Maps any non-empty `x-clerk-user` header to the seeded demo org so the
+// dashboard's local stub can drive the gateway without real Clerk infra.
+const fixtureResolveSession = async (headers) => {
+  const userId = headers.get('x-clerk-user')
+  if (!userId) return null
+  return { userId, orgId: DEMO_FIXTURE.orgId }
+}
+
+let resolveSession
+if (process.env.CLERK_SECRET_KEY) {
+  resolveSession = clerkResolveSession
+} else if (env.SEED_FIXTURE) {
+  await seedFixture(storage, DEMO_FIXTURE)
+  console.log(`[gateway] seeded fixture org=${DEMO_FIXTURE.orgId} site=${DEMO_FIXTURE.siteId}`)
+  resolveSession = fixtureResolveSession
 }
 
 const app = createApp({

@@ -1,4 +1,4 @@
-import { getSession } from '../../lib/auth'
+import { requireSession } from '../../lib/auth'
 import { gatewayJson } from '../../lib/gateway'
 import { Card } from '../ui/Card'
 import { scheduleWebhookAction } from './actions'
@@ -57,7 +57,7 @@ const ProgressBar = ({ value, max }: { value: number; max: number }) => {
 }
 
 export default async function SettingsPage() {
-  const session = await getSession()
+  const session = await requireSession()
   const [metrics, webhooks] = await Promise.all([
     gatewayJson<MetricsResponse>('/v1/metrics').catch(() => null),
     gatewayJson<WebhooksResponse>('/v1/webhooks').catch(() => ({ deliveries: [] as WebhookRow[] })),

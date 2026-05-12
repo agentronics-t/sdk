@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { headers } from 'next/headers'
 import './globals.css'
 import { isClerkConfigured, getSession, type DashboardSession } from '../lib/auth'
 import { ClientProviders } from './ClientProviders'
@@ -17,6 +18,11 @@ const navItems: { href: string; label: string }[] = [
   { href: '/api-keys', label: 'API keys' },
   { href: '/settings', label: 'Settings' },
 ]
+
+const AUTH_PATH_PREFIXES = ['/sign-in', '/sign-up', '/onboarding']
+
+const isAuthRoute = (pathname: string): boolean =>
+  AUTH_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 
 const DashboardChrome = ({
   children,
@@ -79,23 +85,7 @@ const DashboardChrome = ({
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{session.orgName}</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 12, alignItems: 'center' }}>
           <span>{session.email}</span>
-          {session.demoMode ? (
-            <span
-              style={{
-                color: 'var(--accent-on)',
-                background: 'var(--accent)',
-                padding: '2px 8px',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 600,
-              }}
-              title="Set CLERK_SECRET_KEY + NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable real auth"
-            >
-              demo mode
-            </span>
-          ) : (
-            <UserMenu />
-          )}
+          <UserMenu />
         </div>
       </header>
       <main style={{ padding: '1.5rem', flex: 1 }}>{children}</main>
@@ -103,13 +93,33 @@ const DashboardChrome = ({
   </div>
 )
 
+const AuthShell = ({ children }: { children: ReactNode }) => (
+  <div
+    style={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      background: 'var(--bg)',
+    }}
+  >
+    {children}
+  </div>
+)
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const session = await getSession()
+  const pathname = (await headers()).get('x-pathname') ?? '/'
+  const onAuthRoute = isAuthRoute(pathname)
+  const session = onAuthRoute ? null : await getSession()
+
   return (
     <html lang="en">
       <body>
         <ClientProviders clerkEnabled={isClerkConfigured()}>
-          <DashboardChrome session={session}>{children}</DashboardChrome>
+          {onAuthRoute || !session ? (
+            <AuthShell>{children}</AuthShell>
+          ) : (
+            <DashboardChrome session={session}>{children}</DashboardChrome>
+          )}
         </ClientProviders>
       </body>
     </html>

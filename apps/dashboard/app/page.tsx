@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getSession } from '../lib/auth'
+import { requireSession } from '../lib/auth'
 import { gatewayJson } from '../lib/gateway'
 import { Card } from './ui/Card'
 import { Sparkline, type SparklinePoint } from './Sparkline'
@@ -53,7 +53,7 @@ const tryFetchMetrics = async (): Promise<MetricsResponse | null> => {
 }
 
 export default async function OverviewPage() {
-  const session = await getSession()
+  const session = await requireSession()
   const metrics = await tryFetchMetrics()
 
   const sparkPoints = metrics ? sevenDayPoints(metrics.rows ?? []) : []
