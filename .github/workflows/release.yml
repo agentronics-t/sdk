@@ -1,24 +1,15 @@
 name: Release
 
-# DISABLED until release infrastructure is in place. Re-enable by restoring
-# the `push` trigger below once these are configured:
-#   1. Repo settings → Actions → General → Workflow permissions:
-#      enable "Read and write" + "Allow GitHub Actions to create and
-#      approve pull requests" (required so changesets/action can open the
-#      "Version Packages" PR).
-#   2. npm Trusted Publisher set up on npmjs.com for @agentronics/protocol,
-#      @agentronics/sdk, @agentronics/react. See
-#      `apps/mds/sdk-coding-plan.md` §9 items 9–10 and
-#      `apps/mds/sdk-deploy-runbook.md` §4.
-#   3. GitHub environment `npm-publish` created in repo settings →
-#      Environments, with required reviewers (your handle).
-#
-# Until then, the workflow can still be triggered manually from the
-# Actions tab via "Run workflow" (workflow_dispatch).
+# Auto-publishes via Changesets + npm Trusted Publishing. On a push to main:
+#   - If there are unconsumed changesets, opens/updates the "Version Packages" PR.
+#   - If a "Version Packages" PR was just merged (no changesets remain),
+#     publishes the bumped versions to npm with provenance via OIDC.
+# The `npm-publish` environment gates the publish step on required-reviewer
+# approval and is the environment claim Trusted Publishing matches against.
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
 
 concurrency:
   group: release-${{ github.ref }}
@@ -33,6 +24,7 @@ jobs:
   release:
     name: Release via Changesets
     runs-on: ubuntu-latest
+    environment: npm-publish
     steps:
       - uses: actions/checkout@v4
         with:
