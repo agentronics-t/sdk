@@ -38,7 +38,13 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-          registry-url: https://registry.npmjs.org
+          # NOTE: `registry-url` is intentionally omitted. Setting it makes
+          # setup-node write an .npmrc with `_authToken=${NODE_AUTH_TOKEN}`,
+          # which the npm CLI then prefers over the OIDC token even when the
+          # auth-token is empty — breaking Trusted Publishing (404 on PUT).
+          # Without the file, npm detects the OIDC env vars
+          # (ACTIONS_ID_TOKEN_REQUEST_URL/TOKEN) and mints a publish credential
+          # automatically against the per-package Trusted Publisher config.
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
