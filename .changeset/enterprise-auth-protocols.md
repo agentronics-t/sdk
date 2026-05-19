@@ -1,6 +1,6 @@
 ---
-"@agentronics/protocol": minor
-"@agentronics/sdk": minor
+"@agentronics/protocol": patch
+"@agentronics/sdk": patch
 ---
 
 Add enterprise auth protocol support — SSO (OIDC), SPIFFE (JWT-SVID), Google Agent Identity, and mTLS.
