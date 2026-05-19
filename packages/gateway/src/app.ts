@@ -14,6 +14,9 @@ import { createApiKeyRoutes } from './routes/apiKeys.js'
 import { createMetricsRoutes } from './routes/metrics.js'
 import { createAuditRoutes } from './routes/audit.js'
 import { createWebhookRoutes } from './routes/webhooks.js'
+import { createVerifyRoutes } from './routes/verify.js'
+import { createSiteRoutes } from './routes/sites.js'
+import { createSiteProtocolConfigRoutes } from './routes/siteProtocolConfig.js'
 import { createInMemoryStorage } from './storage/memory.js'
 import type { Storage } from './storage/types.js'
 import { GATEWAY_LANDING_HTML } from './landing.js'
@@ -84,6 +87,9 @@ export const createApp = ({
   app.route('/', createMetricsRoutes({ storage, resolveSession }))
   app.route('/', createAuditRoutes({ storage, resolveSession }))
   app.route('/', createApiKeyRoutes({ storage, resolveSession }))
+  app.route('/', createSiteRoutes({ storage, resolveSession }))
+  app.route('/', createSiteProtocolConfigRoutes({ storage, resolveSession }))
+  app.route('/', createVerifyRoutes({ storage }))
   app.route(
     '/',
     createWebhookRoutes({

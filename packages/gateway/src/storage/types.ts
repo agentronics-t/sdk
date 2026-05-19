@@ -95,6 +95,41 @@ export interface RateLimitWindow {
   count: number
 }
 
+// Per-site verifier configuration for the enterprise auth protocols
+// (sso, spiffe, mtls). One row per (site, protocol). google-agent is a
+// flavor of spiffe — it reads the spiffe row's `googleTrustDomains`.
+export type SiteProtocolName = 'sso' | 'spiffe' | 'mtls'
+
+export interface SsoConfig {
+  issuer: string // HTTPS URL; well-known discovery hangs off this
+  audiences: string[] // exact-match allowlist for the token's `aud` claim
+}
+
+export interface SpiffeConfig {
+  trustDomain: string // e.g. 'prod.acme.example'
+  bundleEndpoint: string // SPIFFE Bundle URL for JWKS retrieval
+  audiences: string[] // exact-match allowlist for the token's `aud` claim
+  // Customer-maintained list of GCP trust domains (one per project) that
+  // trigger Google vendor enrichment. Empty/omitted = no enrichment.
+  googleTrustDomains?: string[]
+}
+
+export interface MtlsConfig {
+  rootCerts: string[] // PEM-encoded CA certs the customer trusts
+  spiffeTrustDomain?: string // accept X.509-SVIDs with this trust domain
+  xfccEntryPolicy: 'last' | 'first' | 'only' // see plan §D2
+}
+
+export type SiteProtocolConfigPayload = SsoConfig | SpiffeConfig | MtlsConfig
+
+export interface SiteProtocolConfigRecord {
+  id: string
+  siteId: string
+  protocol: SiteProtocolName
+  config: SiteProtocolConfigPayload
+  createdAt: string
+}
+
 export interface OrgRepository {
   create(input: { name: string }): Promise<OrgRecord>
   /** Insert with a known id; no-op if one already exists. Used by the seed flow. */
@@ -108,6 +143,8 @@ export interface SiteRepository {
   get(siteId: string): Promise<SiteRecord | null>
   /** Lists every site owned by an org. Used by trace-ingest siteId enforcement. */
   listForOrg(orgId: string): Promise<SiteRecord[]>
+  /** Removes a site by id. Caller is responsible for ownership checks. */
+  delete(siteId: string): Promise<void>
 }
 
 export interface ApiKeyRepository {
@@ -179,6 +216,20 @@ export interface AuditRepository {
   list(orgId: string): Promise<AuditEntry[]>
 }
 
+export interface SiteProtocolConfigRepository {
+  upsert(input: {
+    siteId: string
+    protocol: SiteProtocolName
+    config: SiteProtocolConfigPayload
+  }): Promise<SiteProtocolConfigRecord>
+  getForSite(
+    siteId: string,
+    protocol: SiteProtocolName
+  ): Promise<SiteProtocolConfigRecord | null>
+  listForSite(siteId: string): Promise<SiteProtocolConfigRecord[]>
+  delete(siteId: string, protocol: SiteProtocolName): Promise<void>
+}
+
 export interface Storage {
   orgs: OrgRepository
   sites: SiteRepository
@@ -192,4 +243,5 @@ export interface Storage {
   aggregates: AggregatesRepository
   quota: QuotaRepository
   rateLimit: RateLimitRepository
+  siteProtocolConfig: SiteProtocolConfigRepository
 }

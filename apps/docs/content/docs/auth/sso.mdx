@@ -1,0 +1,92 @@
+---
+title: SSO (OIDC)
+description: Workforce SSO via OpenID Connect ID tokens — Okta, Azure AD, Google Workspace, Auth0.
+---
+
+# SSO (OIDC)
+
+Workforce agents acting on behalf of a human in an enterprise IdP tenant. The agent has done an SSO flow (interactive or service‑account) and holds an OIDC ID token. The SDK forwards the token to the gateway, which validates the JWT signature + claims against the customer‑configured IdP discovery document.
+
+SAML 2.0 is intentionally out of scope for v1 — workforce agents virtually never hold SAML assertions. If your IdP only speaks SAML, file an issue.
+
+## Wire format
+
+Agent presents the ID token like any other bearer credential:
+
+```http
+Authorization: Bearer eyJhbGc...
+X-Agent-Auth: sso
+```
+
+Your site forwards both to the gateway through `verifyToken`:
+
+```ts
+import { Agentronics } from '@agentronics/sdk'
+
+const client = Agentronics.init({
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+  auth: {
+    verifyToken: async (method, token) => {
+      const res = await fetch('https://gateway.agentronics.dev/v1/verify/sso', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${process.env.AGENTRONICS_SECRET_KEY!}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ siteId: 'your-site-id', token }),
+      })
+      return res.ok ? res.json() : null
+    },
+  },
+})
+
+const identity = await client.authenticate({ ssoIdToken: '<the jwt>' })
+// → { class: 'dom', trust: 'verified', vendor: 'acme.okta.com', signals: { sso: true, subject: 'auth0|user-42', … } }
+```
+
+## Per‑site config
+
+The gateway needs to know which IdP to trust per site, and which audiences are acceptable. Today this lands via SQL until the dashboard ships:
+
+```sql
+INSERT INTO site_protocol_config (id, site_id, protocol, config)
+VALUES (
+  'spc_' || substr(md5(random()::text), 1, 12),
+  'your-site-id',
+  'sso',
+  '{
+    "issuer": "https://acme.okta.com",
+    "audiences": ["agentronics:your-site-id"]
+  }'::jsonb
+);
+```
+
+- **`issuer`** — exact HTTPS URL of the IdP. The verifier fetches `<issuer>/.well-known/openid-configuration` to discover the JWKS endpoint. Cached for 1h.
+- **`audiences`** — exact‑match allowlist. The verifier accepts the token if **any** entry in the token's `aud` claim (which may be an array per OIDC) matches **any** entry in this list. **Pick something you control** — the recommended default is `agentronics:<site-id>`. Tell your agent's token issuer to mint with that audience.
+
+## Audience cheatsheet
+
+`aud` conventions vary by platform. For *our* SSO method, the audience is the one your customer/agent uses to call us — not the one used to call AWS/Azure/GCP.
+
+| Source | Audience your token issuer should set | Notes |
+|---|---|---|
+| Custom enterprise IdP | `agentronics:<site-id>` (recommended) | Whatever you've put in our `audiences` allowlist |
+| GitHub Actions | Whatever you pass to `core.getIDToken('<audience>')` | Match in our `audiences` allowlist |
+| AWS STS / Azure / GCP WIF | Out of scope — these audiences are for *those* platforms | We're the receiver, not the WIF target |
+
+## Trust level
+
+| Default | When it bumps to `linked` |
+|---|---|
+| `verified` | OIDC `sub` matches an identity link configured in the dashboard (future) |
+
+## Vendor field
+
+Derived from the issuer's hostname — `acme.okta.com`, `login.microsoftonline.com`, `accounts.google.com`. Group by this in the dashboard to see which IdPs your agents are using.
+
+## Common failure modes
+
+- **`oidc_discovery_failed:<status>`** — IdP's `/.well-known/openid-configuration` returned non‑2xx. Check the issuer URL.
+- **`JWTClaimValidationFailed` (audience)** — token's `aud` claim doesn't intersect with `audiences`. Confirm what the token issuer is putting in `aud`.
+- **`JWTClaimValidationFailed` (issuer)** — token's `iss` doesn't match the configured `issuer`. The config must be exact.
+- **`JWTExpired`** — token is past `exp`. Refresh on the agent side.

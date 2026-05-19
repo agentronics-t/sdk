@@ -106,4 +106,61 @@ describe('auth engine', () => {
       })
     )
   })
+
+  it('includes protocol + subject in trace metadata for the winning method', async () => {
+    const onTrace = vi.fn()
+    const verifyToken = vi.fn(async () => ({
+      trust: 'verified' as const,
+      vendor: 'okta.com',
+      validUntil: new Date(Date.now() + 60_000).toISOString(),
+      subject: 'auth0|user-42',
+      protocol: 'sso' as const,
+    }))
+    const engine = createAuthEngine({ context: { verifyToken }, onTrace })
+    await engine.authenticate({ ssoIdToken: 'eyJ.abc.def' })
+    expect(onTrace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          protocol: 'sso',
+          subject: 'auth0|user-42',
+        }),
+      })
+    )
+  })
+
+  it('relabels spiffe trace as google-agent when the verifier flags google vendor', async () => {
+    const onTrace = vi.fn()
+    const verifyToken = vi.fn(async () => ({
+      trust: 'verified' as const,
+      vendor: 'google',
+      validUntil: new Date(Date.now() + 60_000).toISOString(),
+      subject: 'spiffe://acme-prod.svc.id.goog/resources/vertex/agent-42',
+      protocol: 'google-agent' as const,
+    }))
+    const engine = createAuthEngine({ context: { verifyToken }, onTrace })
+    await engine.authenticate({ spiffeJwt: 'eyJ.spiffe' })
+    expect(onTrace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ protocol: 'google-agent' }),
+      })
+    )
+  })
+
+  it('keeps spiffe protocol label when vendor is not google', async () => {
+    const onTrace = vi.fn()
+    const verifyToken = vi.fn(async () => ({
+      trust: 'verified' as const,
+      vendor: 'prod.acme.example',
+      validUntil: new Date(Date.now() + 60_000).toISOString(),
+      subject: 'spiffe://prod.acme.example/payments/web-fe',
+      protocol: 'spiffe' as const,
+    }))
+    const engine = createAuthEngine({ context: { verifyToken }, onTrace })
+    await engine.authenticate({ spiffeJwt: 'eyJ.spiffe' })
+    expect(onTrace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ protocol: 'spiffe' }),
+      })
+    )
+  })
 })

@@ -7,6 +7,7 @@ import type {
   OrgRecord,
   PolicyDocument,
   QuotaCounter,
+  SiteProtocolConfigRecord,
   SiteRecord,
   Storage,
   TraceAggregateRow,
@@ -45,6 +46,7 @@ export const createInMemoryStorage = (seed: InMemoryStorageSeed = {}): Storage =
   const aggregates: TraceAggregateRow[] = []
   const quotaCounters = new Map<string, QuotaCounter>()
   const rateLimitWindows = new Map<string, { windowStart: number; count: number }>()
+  const siteProtocolConfigs = new Map<string, SiteProtocolConfigRecord>() // key = siteId:protocol
   const DEFAULT_QUOTA_LIMIT = 1000
 
   for (const org of seed.orgs ?? []) orgs.set(org.id, org)
@@ -96,6 +98,9 @@ export const createInMemoryStorage = (seed: InMemoryStorageSeed = {}): Storage =
       },
       async listForOrg(orgId) {
         return [...sites.values()].filter((site) => site.orgId === orgId)
+      },
+      async delete(siteId) {
+        sites.delete(siteId)
       },
     },
     apiKeys: {
@@ -281,6 +286,30 @@ export const createInMemoryStorage = (seed: InMemoryStorageSeed = {}): Storage =
         }
         existing.count += 1
         return { count: existing.count, resetAt: (windowStart + windowSeconds) * 1000 }
+      },
+    },
+    siteProtocolConfig: {
+      async upsert({ siteId, protocol, config }) {
+        const key = `${siteId}:${protocol}`
+        const existing = siteProtocolConfigs.get(key)
+        const record: SiteProtocolConfigRecord = {
+          id: existing?.id ?? `spc_${cryptoRandom()}`,
+          siteId,
+          protocol,
+          config,
+          createdAt: existing?.createdAt ?? now(),
+        }
+        siteProtocolConfigs.set(key, record)
+        return record
+      },
+      async getForSite(siteId, protocol) {
+        return siteProtocolConfigs.get(`${siteId}:${protocol}`) ?? null
+      },
+      async listForSite(siteId) {
+        return [...siteProtocolConfigs.values()].filter((r) => r.siteId === siteId)
+      },
+      async delete(siteId, protocol) {
+        siteProtocolConfigs.delete(`${siteId}:${protocol}`)
       },
     },
   }

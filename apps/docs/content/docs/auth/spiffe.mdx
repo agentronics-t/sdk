@@ -1,0 +1,78 @@
+---
+title: SPIFFE
+description: Workload-identity agents in Kubernetes / service meshes — JWT-SVID verification against a SPIFFE Bundle.
+---
+
+# SPIFFE
+
+Workload‑identity agents running in cloud infrastructure where [SPIRE](https://spiffe.io/) (or another SPIFFE implementation) issues short‑lived SVIDs. This page covers **JWT‑SVID** specifically — X.509‑SVID agents present client certificates at the TLS layer, which is the [mTLS](./mtls.mdx) flow.
+
+For agents on Google's Agent Identity platform — which is built on SPIFFE — see the [Google Agent Identity](./google-agent.mdx) page.
+
+## SPIFFE in one paragraph
+
+Every workload gets a **SPIFFE ID** — a URI like `spiffe://prod.acme.example/payments/web-fe`. The authority component (`prod.acme.example`) is the **trust domain**: the cryptographic root of authority. JWT‑SVIDs are JWTs whose `sub` claim is the SPIFFE ID. They are signed by keys published in the trust domain's **SPIFFE Bundle** (a JWKS document where each key carries `use: "jwt-svid"`).
+
+## Wire format
+
+```http
+Authorization: Bearer eyJhbGc...
+X-Agent-Auth: spiffe
+```
+
+```ts
+const identity = await client.authenticate({ spiffeJwt: '<the JWT-SVID>' })
+// → {
+//   class: 'webmcp',
+//   trust: 'verified',
+//   vendor: 'prod.acme.example',
+//   signals: { spiffe: true, spiffeId: 'spiffe://prod.acme.example/payments/web-fe', … }
+// }
+```
+
+## Per‑site config
+
+```sql
+INSERT INTO site_protocol_config (id, site_id, protocol, config)
+VALUES (
+  'spc_' || substr(md5(random()::text), 1, 12),
+  'your-site-id',
+  'spiffe',
+  '{
+    "trustDomain": "prod.acme.example",
+    "bundleEndpoint": "https://spire-server.prod.acme.example/bundle",
+    "audiences": ["agentronics:your-site-id"]
+  }'::jsonb
+);
+```
+
+- **`trustDomain`** — your SPIFFE trust domain. The verifier rejects any JWT‑SVID whose `sub` doesn't come from this domain (unless it matches an entry in `googleTrustDomains` — see [Google Agent Identity](./google-agent.mdx)).
+- **`bundleEndpoint`** — URL to the SPIFFE Bundle. The verifier fetches it, normalizes `use: "jwt-svid"` → `use: "sig"` (jose convention), and caches for 1h.
+- **`audiences`** — exact‑match allowlist for the token's `aud` claim (the SPIFFE spec requires `aud` to be present; we enforce it matches a configured value).
+- **`googleTrustDomains`** *(optional)* — see the Google page.
+
+## JWT‑SVID requirements (per the SPIFFE spec)
+
+Required claims:
+
+- **`sub`** — MUST be the SPIFFE ID (`spiffe://trust-domain/path`)
+- **`aud`** — MUST be present (one or more values)
+- **`exp`** — MUST be set; verifier rejects tokens without it
+
+Accepted signing algorithms: `RS256`/`RS384`/`RS512`, `ES256`/`ES384`/`ES512`, `PS256`/`PS384`/`PS512`. We reject `none` and any HS* variant.
+
+## Trust level
+
+Always `verified`. SPIFFE IDs are workload identities, not user identities — there is no `linked` upgrade. The identity *is* the workload.
+
+## Vendor field
+
+The trust domain (e.g. `prod.acme.example`). Dashboards group by this so you can see which trust domain is producing which traffic. When the trust domain matches a configured Google entry, the vendor switches to `google` and the trace protocol switches to `google-agent`.
+
+## Common failure modes
+
+- **`spiffe_invalid_sub`** — `sub` is not a `spiffe://` URI.
+- **`spiffe_trust_domain_mismatch`** — `sub`'s trust domain is neither the configured primary nor in `googleTrustDomains`.
+- **`spiffe_bundle_fetch_failed:<status>`** — the SPIFFE Bundle endpoint returned non‑2xx. Confirm `bundleEndpoint` is reachable from the gateway.
+- **`JWKSNoMatchingKey`** — the bundle has no key matching the JWT's `kid`. Confirm the SPIFFE Bundle is fresh (key rotation).
+- **`JWTClaimValidationFailed` (audience)** — `aud` doesn't intersect with the configured `audiences`.

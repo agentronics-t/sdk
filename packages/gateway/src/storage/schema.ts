@@ -93,3 +93,16 @@ export const rateLimitWindows = pgTable('rate_limit_windows', {
   windowStart: integer('window_start').notNull(),
   count: integer('count').notNull().default(0),
 })
+
+// Per-site verifier configuration for the four enterprise auth protocols
+// (sso, spiffe, mtls). google-agent reads the spiffe row's
+// `googleTrustDomains` field — no separate row. Config shape is encoded
+// in jsonb and validated at write time by the dashboard / SQL inserter;
+// types live in `./types.ts`.
+export const siteProtocolConfig = pgTable('site_protocol_config', {
+  id: text('id').primaryKey(),
+  siteId: text('site_id').notNull(),
+  protocol: text('protocol').notNull(), // 'sso' | 'spiffe' | 'mtls'
+  config: jsonb('config').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})

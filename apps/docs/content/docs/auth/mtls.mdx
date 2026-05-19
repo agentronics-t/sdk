@@ -1,0 +1,98 @@
+---
+title: mTLS
+description: Mutual TLS via x-forwarded-client-cert (XFCC) — server-to-server agents and X.509-SVID workloads.
+---
+
+# mTLS
+
+Server‑to‑server agents and infrastructure callers presenting an X.509 client certificate at the TLS handshake. Covers both standard mTLS and SPIFFE X.509‑SVIDs.
+
+## Browser reality check
+
+**mTLS does not run in the browser SDK.** JavaScript cannot inspect its own TLS state, so the auth method ships in the Node companion only. Browser builds that instantiate `mtls()` will silently return `null` (no `xfccHeader` available).
+
+## How it works
+
+Your edge proxy (Envoy, nginx, Cloudflare, AWS ALB‑with‑mTLS, your service mesh's ingress, etc.) terminates mTLS, validates the chain, and forwards the cert info via the `x-forwarded-client-cert` (XFCC) header — the Envoy de‑facto standard adopted by most meshes.
+
+Your Node companion reads the header verbatim and hands it to the gateway:
+
+```ts
+import { Agentronics } from '@agentronics/sdk'
+
+app.post('/api/agent', async (req, res) => {
+  const client = Agentronics.init({ publishableKey, auth: { verifyToken: forwardToGateway } })
+  const identity = await client.authenticate({
+    xfccHeader: req.headers['x-forwarded-client-cert'] as string,
+  })
+  // identity?.signals.spiffeId is set if the URI SAN carried a spiffe:// value
+})
+```
+
+## XFCC format
+
+Envoy text format — comma‑separated entries, semicolon‑separated key/value pairs within an entry, double quotes around values containing reserved characters:
+
+```
+By=spiffe://edge.acme/proxy;Hash=abc123;Subject="CN=agent-42,O=Acme";URI=spiffe://prod.acme/agents/42
+```
+
+Fields the verifier reads:
+
+- **`By`** — SAN URI of the proxy's own cert (which proxy forwarded this)
+- **`Hash`** — SHA‑256 of the client cert
+- **`Cert`** — full client cert (URL‑encoded PEM)
+- **`Chain`** — full chain (URL‑encoded PEM) — optional
+- **`Subject`** — cert Subject (`CN=agent-42,O=Acme`)
+- **`URI`** — URI SANs (this is where SPIFFE X.509‑SVIDs live as `spiffe://…`)
+- **`DNS`** — DNS SANs
+
+## Edge configuration — critical
+
+Configure your edge with **`forward_client_cert_details: SANITIZE_SET`** (Envoy) or the equivalent in your ingress. Each trust boundary should produce exactly one XFCC entry from a known sender.
+
+**Never use `ALWAYS_FORWARD_ONLY` at a trust boundary** — that lets a client forge the XFCC header from the public internet, and our verifier will happily accept it.
+
+## Per‑site config
+
+```sql
+INSERT INTO site_protocol_config (id, site_id, protocol, config)
+VALUES (
+  'spc_' || substr(md5(random()::text), 1, 12),
+  'your-site-id',
+  'mtls',
+  '{
+    "rootCerts": [
+      "-----BEGIN CERTIFICATE-----\nMIID...your CA cert...\n-----END CERTIFICATE-----"
+    ],
+    "spiffeTrustDomain": "prod.acme.example",
+    "xfccEntryPolicy": "last"
+  }'::jsonb
+);
+```
+
+- **`rootCerts`** — PEM‑encoded CAs you trust. The verifier confirms the leaf cert was issued by one of these and the signature verifies.
+- **`spiffeTrustDomain`** *(optional)* — if the leaf's URI SAN carries `spiffe://...`, the trust domain must match this value. Lets you accept X.509‑SVIDs from a particular SPIRE deployment.
+- **`xfccEntryPolicy`** — which XFCC entry to trust when multiple proxies have appended:
+  - **`last`** *(default)* — the immediate verified upstream. Safe with `SANITIZE_SET` at the edge.
+  - **`first`** — only for fully mesh‑verified chains (Istio `APPEND_FORWARD` end‑to‑end).
+  - **`only`** — strictest; rejects the request if more than one entry is present.
+
+## Trust level
+
+| Default | When it bumps to `linked` |
+|---|---|
+| `verified` | Cert SAN matches an identity link configured in the dashboard (future) |
+
+## Vendor field
+
+Derived from the issuing CA's Subject DN (e.g. `CN=Acme Root CA, O=Acme`). For SPIFFE X.509‑SVIDs, the trust domain is also surfaced in `signals.spiffeId` so dashboards can correlate X.509‑SVID and JWT‑SVID traffic from the same workload.
+
+## Common failure modes
+
+- **`xfcc_no_entries`** — XFCC header was missing or empty. Confirm your edge actually terminated mTLS for this request.
+- **`xfcc_entry_missing_cert`** — XFCC entry didn't include the `Cert` field. Configure your edge to forward it (Envoy: `set_current_client_cert_details: { cert: true, ... }`).
+- **`xfcc_multiple_entries_under_only_policy`** — your `xfccEntryPolicy` is `only` but multiple entries arrived. Either change the policy or reconfigure the edge to use `SANITIZE_SET`.
+- **`mtls_no_matching_root`** — the leaf cert's issuer doesn't match any cert in `rootCerts`. Add the root, or check the cert chain.
+- **`mtls_signature_invalid`** — the leaf cert's signature doesn't verify against the matched root. Unusual — usually means an XFCC tampering attempt.
+- **`mtls_spiffe_trust_domain_mismatch`** — the URI SAN's SPIFFE trust domain doesn't match `spiffeTrustDomain`. Confirm the SPIRE deployment.

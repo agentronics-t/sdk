@@ -15,6 +15,7 @@ const navItems: { href: string; label: string }[] = [
   { href: '/', label: 'Overview' },
   { href: '/live', label: 'Live' },
   { href: '/traces', label: 'Traces' },
+  { href: '/sites', label: 'Sites' },
   { href: '/api-keys', label: 'API keys' },
   { href: '/settings', label: 'Settings' },
 ]

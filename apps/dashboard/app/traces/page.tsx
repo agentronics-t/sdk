@@ -27,6 +27,27 @@ const TYPES = [
 
 const CLASSES = ['', 'webmcp', 'dom', 'screenshot'] as const
 
+const PROTOCOLS = [
+  '',
+  'sso',
+  'spiffe',
+  'google-agent',
+  'mtls',
+  'bearer',
+  'oauth2',
+  'extension',
+  'session-link',
+  'x-agent-header',
+  'detection',
+  'declaration',
+] as const
+
+const readString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.length > 0 ? value : undefined
+
+const truncate = (value: string, max = 32): string =>
+  value.length > max ? `${value.slice(0, max - 1)}…` : value
+
 const cell = {
   padding: '6px 8px',
   borderBottom: '1px solid var(--border)',
@@ -40,6 +61,7 @@ const headerCell = { ...cell, textAlign: 'left' as const, background: 'var(--bg-
 interface SearchParams {
   agentClass?: string
   type?: string
+  protocol?: string
   since?: string
   until?: string
   cursor?: string
@@ -72,6 +94,13 @@ export default async function TracesPage(props: {
   const data = await gatewayJson<TraceQueryResponse>('/v1/traces', { query: cleanQuery(params) }).catch(
     () => ({ events: [], nextCursor: null })
   )
+  // Protocol filter is applied client-side over the returned page — the
+  // gateway query layer doesn't index `metadata.protocol` yet (JSONB scan
+  // would be slow on big tables; will move server-side once we add a
+  // partial index). For 50-200 event pages this is fine.
+  const events = params.protocol
+    ? data.events.filter((event) => readString(event.metadata?.protocol) === params.protocol)
+    : data.events
 
   return (
     <section style={{ display: 'grid', gap: 16 }}>
@@ -109,6 +138,16 @@ export default async function TracesPage(props: {
             </select>
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+            <span style={{ color: 'var(--text-muted)' }}>Protocol</span>
+            <select name="protocol" defaultValue={params.protocol ?? ''}>
+              {PROTOCOLS.map((value) => (
+                <option key={value || 'any'} value={value}>
+                  {value || 'any'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
             <span style={{ color: 'var(--text-muted)' }}>Since (ISO)</span>
             <input name="since" type="text" defaultValue={params.since ?? ''} placeholder="2026-05-01T00:00:00Z" />
           </label>
@@ -136,13 +175,15 @@ export default async function TracesPage(props: {
         </form>
       </Card>
 
-      <Card title={`${data.events.length} events`}>
+      <Card title={`${events.length} events${params.protocol ? ` (filtered to ${params.protocol})` : ''}`}>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 720 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 920 }}>
             <thead>
               <tr>
                 <th style={headerCell}>occurred</th>
                 <th style={headerCell}>type</th>
+                <th style={headerCell}>protocol</th>
+                <th style={headerCell}>subject</th>
                 <th style={headerCell}>tool</th>
                 <th style={headerCell}>agent</th>
                 <th style={headerCell}>trust</th>
@@ -150,23 +191,31 @@ export default async function TracesPage(props: {
               </tr>
             </thead>
             <tbody>
-              {data.events.length === 0 && (
+              {events.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ ...cell, color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ ...cell, color: 'var(--text-muted)' }}>
                     No matching events.
                   </td>
                 </tr>
               )}
-              {data.events.map((event) => (
-                <tr key={event.id}>
-                  <td style={cell}>{new Date(event.occurredAt).toISOString()}</td>
-                  <td style={cell}>{event.type}</td>
-                  <td style={cell}>{event.tool ?? '—'}</td>
-                  <td style={cell}>{event.agent?.class ?? '—'}</td>
-                  <td style={cell}>{event.agent?.trust ?? '—'}</td>
-                  <td style={cell}>{event.outcome}</td>
-                </tr>
-              ))}
+              {events.map((event) => {
+                const eventProtocol = readString(event.metadata?.protocol)
+                const eventSubject = readString(event.metadata?.subject)
+                return (
+                  <tr key={event.id}>
+                    <td style={cell}>{new Date(event.occurredAt).toISOString()}</td>
+                    <td style={cell}>{event.type}</td>
+                    <td style={cell}>{eventProtocol ?? '—'}</td>
+                    <td style={cell} title={eventSubject ?? undefined}>
+                      {eventSubject ? truncate(eventSubject) : '—'}
+                    </td>
+                    <td style={cell}>{event.tool ?? '—'}</td>
+                    <td style={cell}>{event.agent?.class ?? '—'}</td>
+                    <td style={cell}>{event.agent?.trust ?? '—'}</td>
+                    <td style={cell}>{event.outcome}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

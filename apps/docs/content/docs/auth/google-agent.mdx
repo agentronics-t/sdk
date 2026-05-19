@@ -1,0 +1,63 @@
+---
+title: Google Agent Identity
+description: Agents on Google's Agent Identity platform — a SPIFFE flavor with Google-specific vendor enrichment.
+---
+
+# Google Agent Identity
+
+> **TL;DR — Google Agent Identity is built on SPIFFE.** Google IAM assigns each agent a SPIFFE ID like `spiffe://<PROJECT_ID>.svc.id.goog/resources/vertex/agent-42` and issues JWT‑SVIDs against it. Our verifier handles these in the [SPIFFE](./spiffe.mdx) method — this page just documents the Google‑specific enrichment.
+
+## What we actually verify
+
+Two paths exist for Google agents calling third parties:
+
+1. **JWT‑SVID issued by Google's trust domain** — standard SPIFFE JWT‑SVID, validated against Google's SPIFFE bundle. **This is the path this page is about.**
+2. **OAuth bearer / API key retrieved via Google's Agent Auth Manager** — from our point of view this is plain OAuth; use the existing [OAuth2 method](./overview.mdx#authenticating-protocol-credentials) instead.
+
+Google's "bound access tokens" (X.509‑bound) flow only to Google Cloud APIs and cannot be presented to us.
+
+## Per‑site config (add to the SPIFFE row)
+
+The gateway reads the same `spiffe` config row used for non‑Google SPIFFE. Add Google trust domains to the `googleTrustDomains` array:
+
+```sql
+UPDATE site_protocol_config
+SET config = jsonb_set(
+  config,
+  '{googleTrustDomains}',
+  '["acme-prod.svc.id.goog", "acme-staging.svc.id.goog"]'::jsonb
+)
+WHERE site_id = 'your-site-id' AND protocol = 'spiffe';
+```
+
+When a JWT‑SVID's trust domain matches an entry in this list, the verifier:
+
+- Sets `vendor` to `google`
+- Sets the trace `protocol` to `google-agent` (so dashboards can pivot)
+- Lifts known Google agent claims (`agent_id`, `agent_name`, `agent_owner`) from the JWT payload into `signals`
+
+## Why per‑project (not global)
+
+GCP assigns each project its own SPIFFE trust domain — typically `<PROJECT_ID>.svc.id.goog` for GKE Workload Identity, plus project‑scoped trust domains for IAM Agent Identity. There is **no global Google SPIFFE trust domain**. Customers must list each GCP project (or Anthos fleet, for opted‑in fleet‑level trust domains) they expect agents from. Empty list is a valid state — it just means no Google enrichment fires.
+
+## Verify endpoint
+
+Two routes serve Google agents:
+
+- **`POST /v1/verify/spiffe`** — verifies any JWT‑SVID, applies Google enrichment if the trust domain matches.
+- **`POST /v1/verify/google-agent`** — same verification, but rejects with `403 not_google_trust_domain` if the trust domain isn't in `googleTrustDomains`. Use this when your site only accepts Google agents on a particular path.
+
+Body shape is identical: `{ siteId, token }`.
+
+## Trust level
+
+`verified` — same as SPIFFE. No `linked` upgrade.
+
+## Common failure modes
+
+- **`not_google_trust_domain`** *(google-agent route only)* — the JWT‑SVID's trust domain isn't in `googleTrustDomains`. Add it, or use `/v1/verify/spiffe` instead.
+- All other failure modes are the same as the [SPIFFE](./spiffe.mdx) page.
+
+## Why we don't have a separate verifier
+
+Treating Google as a separate protocol would have meant duplicating SPIFFE verification logic and forcing customers to configure two rows for what is effectively the same JWT format. Instead the verifier collapses the two: one config row, one verifier, one trust model. The `google-agent` label exists purely as a dashboard convenience.

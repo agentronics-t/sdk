@@ -5,6 +5,9 @@ import * as schema from './schema.js'
 import { computeEtag } from './memory.js'
 import type {
   ApiKeyScope,
+  SiteProtocolConfigPayload,
+  SiteProtocolConfigRecord,
+  SiteProtocolName,
   Storage,
   TraceAggregateRow,
   WebhookDeliveryStatus,
@@ -106,6 +109,14 @@ export const createPostgresStorage = (databaseUrl: string): Storage => {
           name: r.name,
           createdAt: r.createdAt.toISOString(),
         }))
+      },
+      async delete(siteId) {
+        // Cascade: also remove any per-site protocol config rows so the
+        // dashboard's "delete site" UI doesn't leave orphan configs.
+        await db
+          .delete(schema.siteProtocolConfig)
+          .where(eq(schema.siteProtocolConfig.siteId, siteId))
+        await db.delete(schema.sites).where(eq(schema.sites.id, siteId))
       },
     },
 
@@ -540,6 +551,85 @@ export const createPostgresStorage = (databaseUrl: string): Storage => {
             .insert(schema.quotaCounters)
             .values({ orgId, period, count: 0, limit })
         }
+      },
+    },
+
+    siteProtocolConfig: {
+      async upsert({ siteId, protocol, config }) {
+        // One row per (siteId, protocol). No unique index in the schema
+        // today — the dashboard / SQL inserter is the writer, so we
+        // delete then insert to keep semantics simple. Acceptable
+        // because writes are rare (config edits) and reads are cached
+        // upstream in the verifier.
+        await db
+          .delete(schema.siteProtocolConfig)
+          .where(
+            and(
+              eq(schema.siteProtocolConfig.siteId, siteId),
+              eq(schema.siteProtocolConfig.protocol, protocol)
+            )
+          )
+        const id = `spc_${cryptoRandom()}`
+        const [row] = await db
+          .insert(schema.siteProtocolConfig)
+          .values({
+            id,
+            siteId,
+            protocol,
+            config: config as unknown as Record<string, unknown>,
+          })
+          .returning()
+        return {
+          id: row!.id,
+          siteId: row!.siteId,
+          protocol: row!.protocol as SiteProtocolName,
+          config: row!.config as SiteProtocolConfigPayload,
+          createdAt: row!.createdAt.toISOString(),
+        }
+      },
+      async getForSite(siteId, protocol) {
+        const rows = await db
+          .select()
+          .from(schema.siteProtocolConfig)
+          .where(
+            and(
+              eq(schema.siteProtocolConfig.siteId, siteId),
+              eq(schema.siteProtocolConfig.protocol, protocol)
+            )
+          )
+          .limit(1)
+        const r = rows[0]
+        if (!r) return null
+        return {
+          id: r.id,
+          siteId: r.siteId,
+          protocol: r.protocol as SiteProtocolName,
+          config: r.config as SiteProtocolConfigPayload,
+          createdAt: r.createdAt.toISOString(),
+        }
+      },
+      async listForSite(siteId) {
+        const rows = await db
+          .select()
+          .from(schema.siteProtocolConfig)
+          .where(eq(schema.siteProtocolConfig.siteId, siteId))
+        return rows.map<SiteProtocolConfigRecord>((r) => ({
+          id: r.id,
+          siteId: r.siteId,
+          protocol: r.protocol as SiteProtocolName,
+          config: r.config as SiteProtocolConfigPayload,
+          createdAt: r.createdAt.toISOString(),
+        }))
+      },
+      async delete(siteId, protocol) {
+        await db
+          .delete(schema.siteProtocolConfig)
+          .where(
+            and(
+              eq(schema.siteProtocolConfig.siteId, siteId),
+              eq(schema.siteProtocolConfig.protocol, protocol)
+            )
+          )
       },
     },
 
