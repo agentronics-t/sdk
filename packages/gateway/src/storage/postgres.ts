@@ -21,9 +21,6 @@ const cryptoRandom = (): string => {
   return Math.random().toString(36).slice(2, 18)
 }
 
-const isoOrNow = (value: Date | null | undefined): string =>
-  value ? value.toISOString() : new Date().toISOString()
-
 const isoOrNull = (value: Date | null | undefined): string | null =>
   value ? value.toISOString() : null
 
