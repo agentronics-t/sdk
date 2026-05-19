@@ -49,8 +49,12 @@ jobs:
       - name: Create release PR or publish
         uses: changesets/action@v1
         with:
-          publish: pnpm release
-          version: pnpm version
+          # `pnpm version` (no `run`) is reserved by pnpm as the
+          # npm-compatible "show versions" command — it ignores the
+          # script in package.json and exits without bumping anything.
+          # `pnpm run <script>` forces the package-script behavior.
+          publish: pnpm run release
+          version: pnpm run version
           commit: 'chore(release): version packages'
           title: 'chore(release): version packages'
         env:
