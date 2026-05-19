@@ -46,6 +46,15 @@ jobs:
           # (ACTIONS_ID_TOKEN_REQUEST_URL/TOKEN) and mints a publish credential
           # automatically against the per-package Trusted Publisher config.
 
+      # Trusted Publishing (auto-minting a publish credential from the
+      # OIDC token against the per-package Trusted Publisher config)
+      # requires npm >= 11.5.1. Node 20.x ships with npm 10.x, so the
+      # workflow has to upgrade explicitly. Without this, provenance still
+      # signs successfully but the publish PUT goes unauthenticated and
+      # npm returns 404 (or ENEEDAUTH if no .npmrc is present).
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
