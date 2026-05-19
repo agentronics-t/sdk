@@ -1,6 +1,6 @@
 {
   "name": "@agentronics/sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browser SDK for the Agentronics governance layer.",
   "license": "Apache-2.0",
   "type": "module",
@@ -19,7 +19,10 @@
       "require": "./dist/lite.cjs"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
