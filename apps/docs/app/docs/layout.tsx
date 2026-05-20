@@ -2,11 +2,31 @@ import type { ReactNode } from 'react'
 import { DocsLayout } from 'fumadocs-ui/layouts/docs'
 import { source } from '../../lib/source'
 
+/** Sentence-case wordmark + a small DOCS pill — design brief 03 §4. */
+const NavTitle = () => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <span style={{ fontWeight: 700 }}>Agentronics</span>
+    <span
+      style={{
+        fontSize: 10,
+        fontFamily: 'var(--font-space-mono), monospace',
+        letterSpacing: '0.04em',
+        color: '#a4a8c5',
+        border: '1px solid #1f2547',
+        borderRadius: 4,
+        padding: '1px 5px',
+      }}
+    >
+      DOCS
+    </span>
+  </span>
+)
+
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <DocsLayout
       tree={source.pageTree}
-      nav={{ title: 'Agentronics' }}
+      nav={{ title: <NavTitle /> }}
       disableThemeSwitch
     >
       {children}
