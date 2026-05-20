@@ -31,6 +31,14 @@ export const TraceEvent = z.object({
   durationMs: z.number().int().nonnegative().optional(),
   outcome: z.enum(['success', 'error', 'blocked']),
   error: z.string().optional(),
+  /**
+   * Free-form per-event metadata. Reserved keys the gateway and dashboard
+   * treat as well-known:
+   * - `protocol` — the auth protocol that produced the event (sso, spiffe, …).
+   * - `subject`  — the verified identity subject string.
+   * - `page`     — the page path the event occurred on; the dashboard groups
+   *                WebMCP tools and agent activity by this (SDK ≥ 0.1.2).
+   */
   metadata: z.record(z.unknown()).default({}),
 })
 export type TraceEvent = z.infer<typeof TraceEvent>

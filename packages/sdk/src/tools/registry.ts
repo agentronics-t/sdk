@@ -123,9 +123,33 @@ export const createToolRegistry = ({
         onTrace?.({ type: 'tool.executed', tool: name, agent: identity, policy, outcome: 'blocked' })
         throw new Error(policy.reason)
       }
-      const output = await tool.execute(input, { identity })
-      onTrace?.({ type: 'tool.executed', tool: name, agent: identity, policy, outcome: 'success' })
-      return output
+      // Time the execution and trace the outcome either way — a tool that
+      // throws is still something the agent did, and the observability /
+      // analytics surfaces need both the latency and the error.
+      const start = Date.now()
+      try {
+        const output = await tool.execute(input, { identity })
+        onTrace?.({
+          type: 'tool.executed',
+          tool: name,
+          agent: identity,
+          policy,
+          outcome: 'success',
+          durationMs: Date.now() - start,
+        })
+        return output
+      } catch (error) {
+        onTrace?.({
+          type: 'tool.executed',
+          tool: name,
+          agent: identity,
+          policy,
+          outcome: 'error',
+          durationMs: Date.now() - start,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        throw error
+      }
     },
   }
 }

@@ -30,7 +30,20 @@ export interface TracerOptions extends SamplerOptions {
   scrubPaths?: string[]
   exporters?: TraceExporter[]
   onExporterError?: (error: unknown, exporter: TraceExporter, event: TraceEventRecord) => void
+  /**
+   * Resolves the page each emitted event belongs to — stamped into
+   * `metadata.page` (a reserved trace metadata key) unless the caller already
+   * set it. The dashboard groups WebMCP tools and agent activity by this.
+   * Defaults to `location.pathname`; returns `undefined` outside a browser
+   * (SSR / Node tests), in which case no `page` key is written.
+   */
+  pageProvider?: () => string | undefined
 }
+
+const defaultPageProvider = (): string | undefined =>
+  typeof location !== 'undefined' && typeof location.pathname === 'string'
+    ? location.pathname
+    : undefined
 
 export interface Tracer {
   readonly sessionId: string
@@ -52,14 +65,29 @@ export const createTracer = ({
   scrubPaths = DEFAULT_SCRUB_PATHS,
   exporters = [],
   onExporterError,
+  pageProvider = defaultPageProvider,
   ...samplerOptions
 }: TracerOptions): Tracer => {
   const buffer: TraceBuffer = createTraceBuffer(bufferSize)
   const sampler = createSampler(samplerOptions)
 
+  // A host-supplied provider must never break tracing — swallow throws.
+  const readPage = (): string | undefined => {
+    try {
+      return pageProvider()
+    } catch {
+      return undefined
+    }
+  }
+
   return {
     sessionId,
     async emit(input) {
+      const metadata: Record<string, unknown> = { ...input.metadata }
+      if (metadata.page === undefined) {
+        const page = readPage()
+        if (page !== undefined) metadata.page = page
+      }
       const event = TraceEvent.parse(
         scrubValue(
           {
@@ -68,8 +96,8 @@ export const createTracer = ({
             sessionId,
             occurredAt: new Date().toISOString(),
             outcome: input.outcome ?? 'success',
-            metadata: {},
             ...input,
+            metadata,
           },
           scrubPaths
         )
