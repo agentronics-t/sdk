@@ -1,5 +1,15 @@
 /* Override Fumadocs' default theme with the Agentronics palette + Space Mono.
- * Affects every /docs/* page; the marketing landing has its own scoped CSS. */
+ * Affects every /docs/* page; the marketing landing has its own scoped CSS.
+ *
+ * IMPORTANT: Fumadocs UI v14 reads `--fd-*` variables in **HSL channel**
+ * format (`H S% L%`), consumed as `hsl(var(--fd-background) / 1)`. (The
+ * `--color-fd-*` RGB names are the v15 / Tailwind-v4 convention and are NOT
+ * read by v14 — overriding those leaves the stock light theme in place,
+ * which is the bug this file previously had.)
+ *
+ * Dark-only by decision: the docs force the `.dark` class and hide the theme
+ * switcher, so these values are the only theme that ships. `:root` is set to
+ * the same palette purely as a pre-hydration safety net. */
 @import '@agentronics/theme/tokens.css';
 
 html,
@@ -8,22 +18,26 @@ body {
 }
 
 :root,
-.light,
 .dark {
-  --color-fd-background: 7 9 26; /* #07091A */
-  --color-fd-foreground: 244 244 245;
-  --color-fd-muted: 17 21 47; /* #11152F */
-  --color-fd-muted-foreground: 164 168 197;
-  --color-fd-popover: 13 16 40; /* #0D1028 */
-  --color-fd-popover-foreground: 244 244 245;
-  --color-fd-card: 13 16 40;
-  --color-fd-card-foreground: 244 244 245;
-  --color-fd-border: 31 37 71; /* #1F2547 */
-  --color-fd-primary: 99 102 241; /* #6366F1 */
-  --color-fd-primary-foreground: 7 9 26;
-  --color-fd-secondary: 17 21 47;
-  --color-fd-secondary-foreground: 244 244 245;
-  --color-fd-accent: 245 158 11; /* #F59E0B — used for highlights */
-  --color-fd-accent-foreground: 7 9 26;
-  --color-fd-ring: 99 102 241;
+  /* Surfaces — Agentronics dark navy. */
+  --fd-background: 234 58% 6%; /* #07091A */
+  --fd-foreground: 240 5% 96%; /* #F4F4F5 */
+  --fd-muted: 232 47% 13%; /* #11152F */
+  --fd-muted-foreground: 233 22% 71%; /* #A4A8C5 */
+  --fd-popover: 233 51% 10%; /* #0D1028 */
+  --fd-popover-foreground: 240 5% 96%;
+  --fd-card: 233 51% 10%; /* #0D1028 */
+  --fd-card-foreground: 240 5% 96%;
+  --fd-border: 231 39% 20%; /* #1F2547 */
+
+  /* Indigo primary — buttons, links, focus rings, active nav. */
+  --fd-primary: 239 84% 67%; /* #6366F1 */
+  --fd-primary-foreground: 234 58% 6%;
+  --fd-secondary: 232 47% 13%;
+  --fd-secondary-foreground: 240 5% 96%;
+
+  /* Accent here is the hover/active *surface*, not the brand color. */
+  --fd-accent: 232 37% 27%; /* #2C3360 */
+  --fd-accent-foreground: 240 5% 96%;
+  --fd-ring: 239 84% 67%;
 }
