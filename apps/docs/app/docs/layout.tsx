@@ -7,6 +7,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <DocsLayout
       tree={source.pageTree}
       nav={{ title: 'Agentronics' }}
+      disableThemeSwitch
     >
       {children}
     </DocsLayout>

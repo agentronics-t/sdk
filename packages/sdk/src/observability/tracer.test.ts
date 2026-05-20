@@ -81,4 +81,37 @@ describe('tracer', () => {
     expect(tracer.list()).toHaveLength(0)
     expect(exporter.export).not.toHaveBeenCalled()
   })
+
+  it('stamps metadata.page from the page provider', async () => {
+    const tracer = createTracer({ siteId: 'site_1', pageProvider: () => '/checkout' })
+    const event = await tracer.emit({ type: 'tool.registered', tool: 'addToCart' })
+    expect(event?.metadata.page).toBe('/checkout')
+  })
+
+  it('lets the caller override metadata.page', async () => {
+    const tracer = createTracer({ siteId: 'site_1', pageProvider: () => '/checkout' })
+    const event = await tracer.emit({
+      type: 'tool.registered',
+      tool: 'addToCart',
+      metadata: { page: '/explicit' },
+    })
+    expect(event?.metadata.page).toBe('/explicit')
+  })
+
+  it('omits metadata.page when no page is resolvable (SSR / Node)', async () => {
+    const tracer = createTracer({ siteId: 'site_1', pageProvider: () => undefined })
+    const event = await tracer.emit({ type: 'agent.missed' })
+    expect(event?.metadata).not.toHaveProperty('page')
+  })
+
+  it('swallows a throwing page provider', async () => {
+    const tracer = createTracer({
+      siteId: 'site_1',
+      pageProvider: () => {
+        throw new Error('boom')
+      },
+    })
+    const event = await tracer.emit({ type: 'agent.missed' })
+    expect(event?.metadata).not.toHaveProperty('page')
+  })
 })

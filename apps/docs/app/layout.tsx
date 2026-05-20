@@ -19,9 +19,13 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={spaceMono.variable}>
+    <html lang="en" suppressHydrationWarning className={`dark ${spaceMono.variable}`}>
       <body>
-        <RootProvider>{children}</RootProvider>
+        {/* Dark-only by decision (see @agentronics/theme tokens + theme.css):
+            force the dark theme and never let next-themes resolve to light. */}
+        <RootProvider theme={{ defaultTheme: 'dark', enableSystem: false }}>
+          {children}
+        </RootProvider>
       </body>
     </html>
   )
