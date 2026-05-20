@@ -1,5 +1,13 @@
 # @agentronics/react
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [1a718f2]
+- Updated dependencies [1a718f2]
+  - @agentronics/sdk@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
