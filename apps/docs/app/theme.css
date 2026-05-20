@@ -9,7 +9,9 @@
  *
  * Dark-only by decision: the docs force the `.dark` class and hide the theme
  * switcher, so these values are the only theme that ships. `:root` is set to
- * the same palette purely as a pre-hydration safety net. */
+ * the same palette purely as a pre-hydration safety net.
+ *
+ * Design brief 03 — "brand the framework, not reinvent it." */
 @import '@agentronics/theme/tokens.css';
 
 html,
@@ -40,4 +42,54 @@ body {
   --fd-accent: 232 37% 27%; /* #2C3360 */
   --fd-accent-foreground: 240 5% 96%;
   --fd-ring: 239 84% 67%;
+}
+
+/* ----------------------------------------------------------------------- *
+ * Content polish — design brief 03 §7. Generic, framework-stable selectors
+ * only (the docs body always renders real <pre>/<code>/<a> elements).
+ * ----------------------------------------------------------------------- */
+
+::selection {
+  background: rgba(99, 102, 241, 0.32);
+  color: #f4f4f5;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: #07091a;
+}
+::-webkit-scrollbar-thumb {
+  background: #2c3360;
+  border-radius: 5px;
+}
+
+/* Inline code — indigo-tinted pill (§7.3). Excludes code inside <pre>. */
+:not(pre) > code {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.875em;
+  font-weight: 500;
+  font-family: var(--font-space-mono), monospace;
+}
+
+/* Code blocks — the hero surface (§7.4): dark well, clear border. */
+pre {
+  background: #11152f !important;
+  border: 1px solid #1f2547;
+  border-radius: 10px;
+  font-family: var(--font-space-mono), monospace;
+}
+
+/* Focus rings — 2px indigo, never removed (§13). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
 }
