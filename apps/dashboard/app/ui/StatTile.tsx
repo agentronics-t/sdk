@@ -1,37 +1,79 @@
+import type { ReactNode } from 'react'
+
 /**
- * Compact big-number tile for analytics / overview grids. No Card wrapper —
- * lay these out in a `repeat(auto-fit, minmax(...))` grid directly.
+ * Big-number tile for analytics / overview grids — design brief 02 §4.2.
+ * No Card wrapper; lay these out in a grid directly.
  */
 export const StatTile = ({
   label,
   value,
   hint,
   tone = 'default',
+  size = 'lg',
+  aside,
 }: {
   label: string
   value: string | number
-  hint?: string
+  hint?: ReactNode
   tone?: 'default' | 'danger' | 'success'
+  /** lg = 36px headline number; sm = 24px (dates, secondary metrics). */
+  size?: 'lg' | 'sm'
+  /** Optional right-aligned element on the label row (e.g. a sparkline). */
+  aside?: ReactNode
 }) => {
   const valueColor =
-    tone === 'danger' ? 'var(--danger)' : tone === 'success' ? 'var(--success)' : 'var(--text)'
+    tone === 'danger'
+      ? 'var(--err)'
+      : tone === 'success'
+        ? 'var(--ok)'
+        : 'var(--fg)'
   return (
     <div
       style={{
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        padding: '0.9rem 1.1rem',
-        boxShadow: 'var(--shadow-sm)',
-        display: 'grid',
-        gap: 2,
+        borderRadius: 10,
+        padding: 20,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
       }}
     >
-      <div style={{ fontSize: 26, fontWeight: 600, color: valueColor }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: 'var(--fg-faint)',
+          }}
+        >
+          {label}
+        </span>
+        {aside}
+      </div>
+      <div
+        style={{
+          fontSize: size === 'lg' ? 36 : 24,
+          fontWeight: 700,
+          lineHeight: 1.05,
+          letterSpacing: '-0.02em',
+          color: valueColor,
+        }}
+      >
         {typeof value === 'number' ? value.toLocaleString() : value}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</div>
-      {hint ? <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{hint}</div> : null}
+      {hint ? (
+        <div style={{ fontSize: 12, color: 'var(--fg-faint)' }}>{hint}</div>
+      ) : null}
     </div>
   )
 }

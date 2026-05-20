@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { requireSession } from '../lib/auth'
 import { gatewayJson } from '../lib/gateway'
 import { Card } from './ui/Card'
+import { StatTile } from './ui/StatTile'
+import { PageHeader } from './ui/PageHeader'
+import { Icon, type IconName } from './ui/icons'
 import { Sparkline, type SparklinePoint } from './Sparkline'
 
 interface AggregateRow {
@@ -52,71 +55,131 @@ const tryFetchMetrics = async (): Promise<MetricsResponse | null> => {
   }
 }
 
+const QUICK_LINKS: { href: string; icon: IconName; label: string; desc: string }[] = [
+  { href: '/live', icon: 'live', label: 'Live', desc: 'Real-time trace feed, refreshing every 2s.' },
+  { href: '/analytics', icon: 'analytics', label: 'Analytics', desc: 'Auth, authz and activity aggregated from traces.' },
+  { href: '/traces', icon: 'traces', label: 'Traces', desc: 'Filter by class, type and time. Cursor pagination.' },
+  { href: '/webmcp-tools', icon: 'tools', label: 'WebMCP Tools', desc: 'Every page and the tools registered on it.' },
+  { href: '/api-keys', icon: 'keys', label: 'API keys', desc: 'Issue, rotate, revoke. Secrets shown once.' },
+  { href: '/settings', icon: 'settings', label: 'Settings', desc: 'Site ID, region, webhooks and quota.' },
+]
+
 export default async function OverviewPage() {
   const session = await requireSession()
   const metrics = await tryFetchMetrics()
-
   const sparkPoints = metrics ? sevenDayPoints(metrics.rows ?? []) : []
 
   return (
     <section style={{ display: 'grid', gap: 16 }}>
-      <h1 style={{ margin: 0 }}>Overview</h1>
-      <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>
-        Welcome back. Use the sidebar to manage governance for{' '}
-        <strong>{session.orgName}</strong>.
-      </p>
+      <PageHeader
+        title="Overview"
+        sub={
+          <>
+            Governance at a glance for <strong>{session.orgName}</strong>.
+          </>
+        }
+      />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        <Card title="This month">
-          {metrics ? (
-            <>
-              <div style={{ fontSize: 28, fontWeight: 600 }}>{metrics.quota.count.toLocaleString()}</div>
-              <div style={{ color: 'var(--text-muted)' }}>
-                of {metrics.quota.limit.toLocaleString()} governed tool calls
+      {/* Stat tiles. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+          gap: 16,
+        }}
+      >
+        <StatTile
+          label="This month"
+          value={metrics ? metrics.quota.count : '—'}
+          hint={
+            metrics
+              ? `of ${metrics.quota.limit.toLocaleString()} governed tool calls`
+              : 'Gateway unreachable.'
+          }
+          aside={
+            sparkPoints.length > 0 ? (
+              <div style={{ width: 92 }}>
+                <Sparkline points={sparkPoints} width={92} height={28} />
               </div>
-            </>
-          ) : (
-            <div style={{ color: 'var(--text-muted)' }}>Gateway unreachable.</div>
-          )}
-        </Card>
-        <Card title="Total events">
-          <div style={{ fontSize: 28, fontWeight: 600 }}>
-            {metrics?.total?.toLocaleString() ?? '—'}
-          </div>
-          <div style={{ color: 'var(--text-muted)' }}>across every type</div>
-        </Card>
-        <Card title="Period">
-          <div style={{ fontSize: 28, fontWeight: 600 }}>{metrics?.period ?? '—'}</div>
-          <div style={{ color: 'var(--text-muted)' }}>resets at month rollover</div>
-        </Card>
+            ) : undefined
+          }
+        />
+        <StatTile
+          label="Total events"
+          value={metrics ? metrics.total : '—'}
+          hint="Across every trace type."
+        />
+        <StatTile
+          label="Period"
+          value={metrics?.period ?? '—'}
+          size="sm"
+          hint="Resets at month rollover."
+        />
       </div>
 
-      <Card title="Last 7 days">
-        <Sparkline points={sparkPoints} emptyLabel="No traces in the last 7 days." />
-      </Card>
+      {/* Trace volume + quick links. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 2fr) minmax(240px, 1fr)',
+          gap: 16,
+        }}
+      >
+        <Card title="Last 7 days" meta="trace volume">
+          {sparkPoints.length > 0 ? (
+            <Sparkline points={sparkPoints} height={120} />
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
+              No traces in the last 7 days.
+            </div>
+          )}
+        </Card>
 
-      <Card title="Quick links">
-        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 2 }}>
-          <li>
-            <Link href="/live">Live trace feed</Link> — polling-based, refreshes every 2s.
-          </li>
-          <li>
-            <Link href="/analytics">Analytics</Link> — auth, authz and activity, aggregated from traces.
-          </li>
-          <li>
-            <Link href="/traces">Trace explorer</Link> — filter by class / type / time, cursor pagination.
-          </li>
-          <li>
-            <Link href="/webmcp-tools">WebMCP Tools</Link> — every page and the tools registered on it.
-          </li>
-          <li>
-            <Link href="/api-keys">API keys</Link> — issue, rotate, revoke. Secret keys shown once.
-          </li>
-          <li>
-            <Link href="/settings">Settings</Link> — siteId, region, webhook config, quota.
-          </li>
-        </ul>
-      </Card>
+        <Card title="Quick links" padded={false}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {QUICK_LINKS.map((link, i) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '11px 18px',
+                  borderTop: i === 0 ? 'none' : '1px solid var(--border-faint)',
+                  textDecoration: 'none',
+                }}
+              >
+                <Icon
+                  name={link.icon}
+                  size={16}
+                  style={{ color: 'var(--accent-hover)', flexShrink: 0 }}
+                />
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: 'var(--fg)',
+                    }}
+                  >
+                    {link.label}
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
+                    {link.desc}
+                  </span>
+                </span>
+                <Icon
+                  name="chevron-right"
+                  size={14}
+                  style={{ color: 'var(--fg-faint)', flexShrink: 0 }}
+                />
+              </Link>
+            ))}
+          </div>
+        </Card>
+      </div>
     </section>
   )
 }
