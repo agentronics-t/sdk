@@ -14,7 +14,9 @@ export const metadata = {
 const navItems: { href: string; label: string }[] = [
   { href: '/', label: 'Overview' },
   { href: '/live', label: 'Live' },
+  { href: '/analytics', label: 'Analytics' },
   { href: '/traces', label: 'Traces' },
+  { href: '/webmcp-tools', label: 'WebMCP Tools' },
   { href: '/sites', label: 'Sites' },
   { href: '/api-keys', label: 'API keys' },
   { href: '/settings', label: 'Settings' },

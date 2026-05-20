@@ -101,7 +101,13 @@ export default async function OverviewPage() {
             <Link href="/live">Live trace feed</Link> — polling-based, refreshes every 2s.
           </li>
           <li>
+            <Link href="/analytics">Analytics</Link> — auth, authz and activity, aggregated from traces.
+          </li>
+          <li>
             <Link href="/traces">Trace explorer</Link> — filter by class / type / time, cursor pagination.
+          </li>
+          <li>
+            <Link href="/webmcp-tools">WebMCP Tools</Link> — every page and the tools registered on it.
           </li>
           <li>
             <Link href="/api-keys">API keys</Link> — issue, rotate, revoke. Secret keys shown once.
