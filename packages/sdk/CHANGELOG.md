@@ -1,5 +1,22 @@
 # @agentronics/sdk
 
+## 0.1.2
+
+### Patch Changes
+
+- 1a718f2: Stamp `metadata.page` on every emitted trace event. The tracer now resolves
+  the current page (defaulting to `location.pathname`, overridable via the new
+  `pageProvider` tracer option) and writes it to the reserved `metadata.page`
+  key unless the caller already set one. This lets the dashboard group WebMCP
+  tools and agent activity by page. Outside a browser (SSR / Node) no `page`
+  key is written, and a throwing provider can never break tracing.
+- 1a718f2: `tool.executed` traces now carry `durationMs` and report failures. The tool
+  registry times every execution and emits the trace on both paths: a
+  successful call records its latency, and a tool that throws is traced with
+  `outcome: 'error'` and the error message before the error re-throws (it was
+  previously untraced entirely). This is what the dashboard's analytics needs
+  to compute tool-execution latency percentiles and an accurate error rate.
+
 ## 0.1.1
 
 ### Patch Changes
