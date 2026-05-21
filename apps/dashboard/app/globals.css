@@ -20,6 +20,51 @@
   --ok: var(--success);
   --err: var(--danger);
   --warn: var(--warning);
+  color-scheme: dark;
+}
+
+/* -------------------------------------------------------------------------
+ * Light theme — overrides the @agentronics/theme dark defaults plus the
+ * hardcoded local aliases above. Toggled via `html.light` (see ThemeToggle).
+ * The var()-based aliases (--fg, --bg-well, --accent-hover, …) cascade
+ * automatically once their base tokens are re-pointed here. Indigo and amber
+ * stay hue-stable; indigo darkens slightly for AA contrast on the light bg.
+ * ------------------------------------------------------------------------- */
+html.light {
+  --bg: #f7f7fb;
+  --bg-elevated: #ffffff;
+  --bg-muted: #f0f1f7;
+  --border: #e3e4ee;
+  --border-strong: #cdcfdf;
+  --text: #07091a;
+  --text-muted: #5b5f76;
+  --text-faint: #898ca6;
+  --accent-strong: #4f46e5;
+  --accent-on: #ffffff;
+  --highlight-strong: #b45309;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --warning: #b45309;
+  --shadow-sm: 0 1px 2px rgba(7, 9, 26, 0.06);
+  --shadow: 0 8px 24px rgba(7, 9, 26, 0.1);
+
+  /* Local hardcoded aliases (the var()-based ones above cascade for free). */
+  --bg-row: #eef0f7;
+  --border-faint: #eceef5;
+  --fg-2: #3f4358;
+  --accent-soft: rgba(99, 102, 241, 0.1);
+  --accent-ring: rgba(99, 102, 241, 0.3);
+
+  color-scheme: light;
+}
+
+/* Flash-free transition when the toggle flips the theme. */
+html.theme-transition,
+html.theme-transition * {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease !important;
 }
 
 * {
@@ -104,6 +149,10 @@ pre {
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
+}
+html.light .skeleton {
+  background: linear-gradient(90deg, var(--bg-well), #dfe1ee, var(--bg-well));
+  background-size: 200% 100%;
 }
 
 /* Live status pulse — design brief 02 §6. */

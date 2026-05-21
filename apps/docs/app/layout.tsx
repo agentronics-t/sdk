@@ -19,11 +19,11 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`dark ${spaceMono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={spaceMono.variable}>
       <body>
-        {/* Dark-only by decision (see @agentronics/theme tokens + theme.css):
-            force the dark theme and never let next-themes resolve to light. */}
-        <RootProvider theme={{ defaultTheme: 'dark', enableSystem: false }}>
+        {/* Light + dark both ship (see theme.css). next-themes resolves the
+            class; the toggle lives in the docs sidebar. Dark stays default. */}
+        <RootProvider theme={{ defaultTheme: 'dark', enableSystem: true }}>
           {children}
         </RootProvider>
       </body>

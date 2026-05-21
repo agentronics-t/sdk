@@ -7,9 +7,12 @@
  * read by v14 — overriding those leaves the stock light theme in place,
  * which is the bug this file previously had.)
  *
- * Dark-only by decision: the docs force the `.dark` class and hide the theme
- * switcher, so these values are the only theme that ships. `:root` is set to
- * the same palette purely as a pre-hydration safety net.
+ * Both themes ship: `:root` is the light palette, `.dark` the dark one.
+ * next-themes toggles the `.dark` class; the switcher lives in the sidebar.
+ *
+ * Code blocks (<pre>) stay on the dark navy well in both themes — the Shiki
+ * highlighting is tuned for a dark surface, and a dark code well on a light
+ * page is a deliberate, common docs treatment.
  *
  * Design brief 03 — "brand the framework, not reinvent it." */
 @import '@agentronics/theme/tokens.css';
@@ -19,9 +22,32 @@ body {
   font-family: var(--font-space-mono), var(--font-sans);
 }
 
-:root,
+/* Light palette (default) — Agentronics indigo on a near-white surface. */
+:root {
+  --fd-background: 240 33% 98%; /* #F7F7FB */
+  --fd-foreground: 234 58% 6%; /* #07091A */
+  --fd-muted: 233 33% 95%; /* #F0F1F7 */
+  --fd-muted-foreground: 232 13% 41%; /* #5B5F76 */
+  --fd-popover: 0 0% 100%; /* #FFFFFF */
+  --fd-popover-foreground: 234 58% 6%;
+  --fd-card: 0 0% 100%; /* #FFFFFF */
+  --fd-card-foreground: 234 58% 6%;
+  --fd-border: 233 27% 91%; /* #E3E4EE */
+
+  /* Indigo primary — darkened for AA contrast on a light surface. */
+  --fd-primary: 243 75% 59%; /* #4F46E5 */
+  --fd-primary-foreground: 0 0% 100%;
+  --fd-secondary: 233 33% 95%;
+  --fd-secondary-foreground: 234 58% 6%;
+
+  /* Accent here is the hover/active *surface*, not the brand color. */
+  --fd-accent: 233 40% 93%; /* light indigo-tinted hover */
+  --fd-accent-foreground: 234 58% 6%;
+  --fd-ring: 243 75% 59%;
+}
+
+/* Dark palette — Agentronics dark navy. */
 .dark {
-  /* Surfaces — Agentronics dark navy. */
   --fd-background: 234 58% 6%; /* #07091A */
   --fd-foreground: 240 5% 96%; /* #F4F4F5 */
   --fd-muted: 232 47% 13%; /* #11152F */
@@ -50,8 +76,8 @@ body {
  * ----------------------------------------------------------------------- */
 
 ::selection {
-  background: rgba(99, 102, 241, 0.32);
-  color: #f4f4f5;
+  background: rgba(99, 102, 241, 0.28);
+  color: hsl(var(--fd-foreground));
 }
 
 ::-webkit-scrollbar {
@@ -59,14 +85,15 @@ body {
   height: 9px;
 }
 ::-webkit-scrollbar-track {
-  background: #07091a;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2c3360;
+  background: hsl(var(--fd-muted-foreground) / 0.4);
   border-radius: 5px;
 }
 
-/* Inline code — indigo-tinted pill (§7.3). Excludes code inside <pre>. */
+/* Inline code — indigo-tinted pill (§7.3). Excludes code inside <pre>.
+ * The indigo tint reads correctly on both the light and dark surface. */
 :not(pre) > code {
   background: rgba(99, 102, 241, 0.1);
   border: 1px solid rgba(99, 102, 241, 0.18);
@@ -77,7 +104,8 @@ body {
   font-family: var(--font-space-mono), monospace;
 }
 
-/* Code blocks — the hero surface (§7.4): dark well, clear border. */
+/* Code blocks — the hero surface (§7.4): dark well, clear border. Kept dark
+ * in both themes so the Shiki highlighting stays legible. */
 pre {
   background: #11152f !important;
   border: 1px solid #1f2547;

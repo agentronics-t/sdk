@@ -5,6 +5,7 @@ import './globals.css'
 import { isClerkConfigured, getSession, type DashboardSession } from '../lib/auth'
 import { ClientProviders } from './ClientProviders'
 import { UserMenu } from './UserMenu'
+import { ThemeToggle } from './ThemeToggle'
 import { Icon, type IconName } from './ui/icons'
 
 export const metadata = {
@@ -12,6 +13,11 @@ export const metadata = {
   description: 'Configure and observe agent governance for your site.',
   icons: { icon: '/favicon.svg', shortcut: '/favicon.svg', apple: '/favicon.svg' },
 }
+
+/* Runs before hydration so the stored theme is applied with no flash. Dark is
+ * the default (no class); `html.light` opts into light. A first-time visitor
+ * with no stored choice follows their OS preference. */
+const themeInitScript = `(function(){try{var t=localStorage.getItem('agentronics:theme');var light=t==='light'||(!t&&window.matchMedia('(prefers-color-scheme: light)').matches);if(light)document.documentElement.classList.add('light');}catch(e){}})();`
 
 interface NavItem {
   href: string
@@ -279,6 +285,7 @@ const DashboardChrome = ({
           <span style={{ color: 'var(--fg)' }}>{currentLabel(pathname)}</span>
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <ThemeToggle />
           <a
             href="https://sdk.agentronics.dev"
             target="_blank"
@@ -332,6 +339,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <ClientProviders clerkEnabled={isClerkConfigured()}>
           {onAuthRoute || !session ? (
             <AuthShell>{children}</AuthShell>
