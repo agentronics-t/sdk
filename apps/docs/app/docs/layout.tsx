@@ -2,9 +2,10 @@ import type { ReactNode } from 'react'
 import { DocsLayout } from 'fumadocs-ui/layouts/docs'
 import { source } from '../../lib/source'
 
-/** Sentence-case wordmark + a small DOCS pill — design brief 03 §4. */
+/** Logomark + sentence-case wordmark + a small DOCS pill — design brief 03 §4. */
 const NavTitle = () => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <img src="/favicon.svg" alt="" width={22} height={22} style={{ borderRadius: 5 }} />
     <span style={{ fontWeight: 700 }}>Agentronics</span>
     <span
       style={{

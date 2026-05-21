@@ -10,7 +10,7 @@ import { Icon, type IconName } from './ui/icons'
 export const metadata = {
   title: 'Agentronics Dashboard',
   description: 'Configure and observe agent governance for your site.',
-  icons: { icon: '/logo.jpeg', shortcut: '/logo.jpeg', apple: '/logo.jpeg' },
+  icons: { icon: '/favicon.svg', shortcut: '/favicon.svg', apple: '/favicon.svg' },
 }
 
 interface NavItem {
@@ -54,26 +54,16 @@ const currentLabel = (pathname: string): string => {
   return match?.label ?? 'Overview'
 }
 
+/** The Agentronics logomark — the geometric indigo "A" (public/favicon.svg). */
 const BrandMark = ({ size = 22 }: { size?: number }) => (
-  <span
+  <img
+    src="/favicon.svg"
+    alt=""
     aria-hidden="true"
-    style={{
-      width: size,
-      height: size,
-      borderRadius: 5,
-      background: 'var(--highlight)',
-      color: 'var(--bg)',
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontWeight: 700,
-      fontFamily: 'var(--font-mono)',
-      fontSize: Math.round(size * 0.6),
-      flexShrink: 0,
-    }}
-  >
-    A
-  </span>
+    width={size}
+    height={size}
+    style={{ borderRadius: 5, flexShrink: 0 }}
+  />
 )
 
 const Sidebar = ({
