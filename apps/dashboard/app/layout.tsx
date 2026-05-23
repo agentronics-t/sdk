@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
-import Link from 'next/link'
 import { headers } from 'next/headers'
 import './globals.css'
 import { isClerkConfigured, getSession, type DashboardSession } from '../lib/auth'
 import { ClientProviders } from './ClientProviders'
 import { UserMenu } from './UserMenu'
-import { Icon, type IconName } from './ui/icons'
+import { Icon } from './ui/icons'
+import { SidebarNav, type NavGroup } from './SidebarNav'
+import { BreadcrumbLabel } from './BreadcrumbLabel'
 
 export const metadata = {
   title: 'Agentronics Dashboard',
@@ -13,13 +14,7 @@ export const metadata = {
   icons: { icon: '/favicon.svg', shortcut: '/favicon.svg', apple: '/favicon.svg' },
 }
 
-interface NavItem {
-  href: string
-  label: string
-  icon: IconName
-}
-
-const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Workspace',
     items: [
@@ -44,16 +39,6 @@ const AUTH_PATH_PREFIXES = ['/sign-in', '/sign-up', '/onboarding']
 const isAuthRoute = (pathname: string): boolean =>
   AUTH_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 
-const isActive = (href: string, pathname: string): boolean =>
-  href === '/'
-    ? pathname === '/'
-    : pathname === href || pathname.startsWith(`${href}/`)
-
-const currentLabel = (pathname: string): string => {
-  const match = [...ALL_ITEMS].reverse().find((i) => isActive(i.href, pathname))
-  return match?.label ?? 'Overview'
-}
-
 /** The Agentronics logomark — the geometric indigo "A" (public/favicon.svg). */
 const BrandMark = ({ size = 22 }: { size?: number }) => (
   <img
@@ -66,13 +51,7 @@ const BrandMark = ({ size = 22 }: { size?: number }) => (
   />
 )
 
-const Sidebar = ({
-  session,
-  pathname,
-}: {
-  session: DashboardSession
-  pathname: string
-}) => (
+const Sidebar = ({ session }: { session: DashboardSession }) => (
   <aside
     style={{
       width: 220,
@@ -151,41 +130,10 @@ const Sidebar = ({
       </div>
     </div>
 
-    {/* Nav groups. */}
-    <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
-      {NAV_GROUPS.map((group) => (
-        <div key={group.title} style={{ marginBottom: 14 }}>
-          <div
-            style={{
-              padding: '6px 12px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 11,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--fg-faint)',
-            }}
-          >
-            {group.title}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {group.items.map((item) => {
-              const active = isActive(item.href, pathname)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="nav-link"
-                  data-active={active}
-                >
-                  <Icon name={item.icon} size={16} />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-    </nav>
+    {/* Nav groups. Active state is computed client-side via usePathname so
+        client-side <Link> navigation moves the highlight; the root layout
+        itself doesn't re-render between segments. */}
+    <SidebarNav groups={NAV_GROUPS} />
 
     {/* User row. */}
     <div
@@ -238,16 +186,14 @@ const Sidebar = ({
 const DashboardChrome = ({
   children,
   session,
-  pathname,
   clerkEnabled,
 }: {
   children: ReactNode
   session: DashboardSession
-  pathname: string
   clerkEnabled: boolean
 }) => (
   <div style={{ display: 'flex', minHeight: '100vh' }}>
-    <Sidebar session={session} pathname={pathname} />
+    <Sidebar session={session} />
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
       <header
         style={{
@@ -276,7 +222,9 @@ const DashboardChrome = ({
         >
           <span>{session.orgName}</span>
           <span style={{ color: 'var(--fg-faint)' }}>/</span>
-          <span style={{ color: 'var(--fg)' }}>{currentLabel(pathname)}</span>
+          <span style={{ color: 'var(--fg)' }}>
+            <BreadcrumbLabel items={ALL_ITEMS} fallback="Overview" />
+          </span>
         </nav>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <a
@@ -338,7 +286,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           ) : (
             <DashboardChrome
               session={session}
-              pathname={pathname}
               clerkEnabled={isClerkConfigured()}
             >
               {children}

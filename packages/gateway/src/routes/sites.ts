@@ -45,6 +45,10 @@ export const createSiteRoutes = ({
       }
       return c.json({ site: existing }, 200)
     }
+    // First-touch upsert of the Clerk org. Nothing else writes the org row
+    // (api-keys.insert has no org-existence check), so without this the very
+    // first POST /v1/sites against a real Clerk org throws "Unknown org".
+    await storage.orgs.upsert({ id: auth.orgId, name: auth.orgId })
     const site = await storage.sites.create({
       orgId: auth.orgId,
       siteId: parsed.data.siteId,
