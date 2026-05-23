@@ -301,9 +301,26 @@ export const init = (options: InitOptions): AgentronicsClient => {
     if (transition.changed) webmcp.publish(surfaceFor(null))
   }
 
+  // A call that arrives through navigator.modelContext is by definition an
+  // agent call, not a user click. Attribute it explicitly so /traces and
+  // /webmcp-tools show the protocol + class instead of leaving them blank
+  // (which made WebMCP invocations indistinguishable from button clicks).
+  // If a more specific identity was already established (detect/declare/
+  // authenticate), prefer it.
+  const fallbackWebMcpIdentity: AgentIdentity = {
+    class: 'webmcp',
+    trust: 'detected',
+    confidence: 1,
+    vendor: null,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+    detectionVersion: '2026.04',
+    signals: { source: 'navigator.modelContext' },
+  }
+
   const webmcp = createWebMcpAdapter({
     invoke: async (tool, input) => {
-      const result = await tools.execute(tool.name, input, null)
+      const identity = agentContext.snapshot().identity ?? fallbackWebMcpIdentity
+      const result = await tools.execute(tool.name, input, identity)
       handleToolInvoked(tool.name)
       return result
     },
