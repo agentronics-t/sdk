@@ -108,11 +108,20 @@ export const createPostgresStorage = (databaseUrl: string): Storage => {
         }))
       },
       async delete(siteId) {
-        // Cascade: also remove any per-site protocol config rows so the
-        // dashboard's "delete site" UI doesn't leave orphan configs.
-        await db
-          .delete(schema.siteProtocolConfig)
-          .where(eq(schema.siteProtocolConfig.siteId, siteId))
+        // Best-effort cascade for per-site protocol config rows. The
+        // site_protocol_config table only exists in environments where the
+        // schema has been pushed (it's not yet in the canonical migration
+        // set); swallow the error so the primary sites.delete still succeeds.
+        try {
+          await db
+            .delete(schema.siteProtocolConfig)
+            .where(eq(schema.siteProtocolConfig.siteId, siteId))
+        } catch (err) {
+          console.warn(
+            '[gateway] siteProtocolConfig cascade skipped:',
+            (err as Error)?.message
+          )
+        }
         await db.delete(schema.sites).where(eq(schema.sites.id, siteId))
       },
     },
