@@ -8,6 +8,13 @@ interface TraceQueryResponse {
   nextCursor: string | null
 }
 
+interface SiteRow {
+  id: string
+  orgId: string
+  name: string
+  createdAt: string
+}
+
 const TYPES = [
   '',
   'agent.detected',
@@ -62,6 +69,7 @@ interface SearchParams {
   agentClass?: string
   type?: string
   protocol?: string
+  site?: string
   since?: string
   until?: string
   cursor?: string
@@ -91,16 +99,21 @@ export default async function TracesPage(props: {
   searchParams: Promise<SearchParams>
 }) {
   const params = await props.searchParams
-  const data = await gatewayJson<TraceQueryResponse>('/v1/traces', { query: cleanQuery(params) }).catch(
-    () => ({ events: [], nextCursor: null })
-  )
-  // Protocol filter is applied client-side over the returned page — the
-  // gateway query layer doesn't index `metadata.protocol` yet (JSONB scan
-  // would be slow on big tables; will move server-side once we add a
-  // partial index). For 50-200 event pages this is fine.
-  const events = params.protocol
-    ? data.events.filter((event) => readString(event.metadata?.protocol) === params.protocol)
-    : data.events
+  const [data, sitesRes] = await Promise.all([
+    gatewayJson<TraceQueryResponse>('/v1/traces', { query: cleanQuery(params) }).catch(
+      () => ({ events: [] as TraceEvent[], nextCursor: null as string | null })
+    ),
+    gatewayJson<{ sites: SiteRow[] }>('/v1/sites').catch(() => ({ sites: [] as SiteRow[] })),
+  ])
+  // Protocol + site filters are applied client-side over the returned page —
+  // the gateway query layer doesn't yet support filtering by either (protocol
+  // lives in metadata.* JSONB; siteId would benefit from a partial index).
+  // For 50-200 event pages this is fine.
+  const events = data.events.filter((event) => {
+    if (params.protocol && readString(event.metadata?.protocol) !== params.protocol) return false
+    if (params.site && event.siteId !== params.site) return false
+    return true
+  })
 
   return (
     <section style={{ display: 'grid', gap: 16 }}>
@@ -148,6 +161,17 @@ export default async function TracesPage(props: {
             </select>
           </label>
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
+            <span style={{ color: 'var(--text-muted)' }}>Site</span>
+            <select name="site" defaultValue={params.site ?? ''}>
+              <option value="">any</option>
+              {sitesRes.sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.name} ({site.id})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
             <span style={{ color: 'var(--text-muted)' }}>Since (ISO)</span>
             <input name="since" type="text" defaultValue={params.since ?? ''} placeholder="2026-05-01T00:00:00Z" />
           </label>
@@ -175,12 +199,23 @@ export default async function TracesPage(props: {
         </form>
       </Card>
 
-      <Card title={`${events.length} events${params.protocol ? ` (filtered to ${params.protocol})` : ''}`}>
+      <Card
+        title={(() => {
+          const active = [
+            params.protocol ? `protocol=${params.protocol}` : null,
+            params.site ? `site=${params.site}` : null,
+          ].filter(Boolean)
+          return active.length > 0
+            ? `${events.length} events (${active.join(', ')})`
+            : `${events.length} events`
+        })()}
+      >
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 920 }}>
             <thead>
               <tr>
                 <th style={headerCell}>occurred</th>
+                <th style={headerCell}>site</th>
                 <th style={headerCell}>type</th>
                 <th style={headerCell}>protocol</th>
                 <th style={headerCell}>subject</th>
@@ -193,7 +228,7 @@ export default async function TracesPage(props: {
             <tbody>
               {events.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ ...cell, color: 'var(--text-muted)' }}>
+                  <td colSpan={9} style={{ ...cell, color: 'var(--text-muted)' }}>
                     No matching events.
                   </td>
                 </tr>
@@ -204,6 +239,7 @@ export default async function TracesPage(props: {
                 return (
                   <tr key={event.id}>
                     <td style={cell}>{new Date(event.occurredAt).toISOString()}</td>
+                    <td style={cell}>{event.siteId}</td>
                     <td style={cell}>{event.type}</td>
                     <td style={cell}>{eventProtocol ?? '—'}</td>
                     <td style={cell} title={eventSubject ?? undefined}>
