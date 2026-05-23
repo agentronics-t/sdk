@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { AgentIdentity } from '@agentronics/protocol'
 import { createToolRegistry } from './registry.js'
+
+const webmcpIdentity = (overrides: Partial<AgentIdentity> = {}): AgentIdentity => ({
+  class: 'webmcp',
+  trust: 'detected',
+  confidence: 1,
+  vendor: null,
+  userAgent: null,
+  detectionVersion: '2026.04',
+  signals: {},
+  ...overrides,
+})
 
 describe('tool registry', () => {
   it('adds authz policies from registered tools and executes allowed tools', async () => {
@@ -72,6 +84,62 @@ describe('tool registry', () => {
         outcome: 'error',
         error: 'tool failed',
       })
+    )
+  })
+
+  it('uses identityResolver when execute() is called without an identity', async () => {
+    const onTrace = vi.fn()
+    const identity = webmcpIdentity({ vendor: 'anthropic' })
+    const evaluate = vi.fn(async () => ({ decision: 'allow' as const, ruleId: 'tool:ping', reason: 'ok' }))
+    const registry = createToolRegistry({
+      evaluate,
+      onTrace,
+      identityResolver: () => identity,
+    })
+    registry.register({ name: 'ping', execute: () => ({ ok: true }) })
+
+    await registry.execute('ping', {})
+
+    // The policy evaluator and the tool itself both saw the resolved identity.
+    expect(evaluate).toHaveBeenCalledWith('ping', { identity })
+    expect(onTrace).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'tool.executed', agent: identity })
+    )
+  })
+
+  it('respects an explicit null identity as anonymous (overrides the resolver)', async () => {
+    const onTrace = vi.fn()
+    const identity = webmcpIdentity({ vendor: 'anthropic' })
+    const registry = createToolRegistry({
+      evaluate: async () => ({ decision: 'allow', ruleId: 'tool:ping', reason: 'ok' }),
+      onTrace,
+      identityResolver: () => identity,
+    })
+    registry.register({ name: 'ping', execute: () => ({ ok: true }) })
+
+    await registry.execute('ping', {}, null)
+
+    const trace = onTrace.mock.calls
+      .map((call) => call[0])
+      .find((input) => input.type === 'tool.executed')
+    expect(trace?.agent).toBeNull()
+  })
+
+  it('respects an explicit identity argument over the resolver', async () => {
+    const onTrace = vi.fn()
+    const resolverIdentity = webmcpIdentity({ vendor: 'resolver' })
+    const explicitIdentity = webmcpIdentity({ class: 'dom', vendor: 'playwright' })
+    const registry = createToolRegistry({
+      evaluate: async () => ({ decision: 'allow', ruleId: 'tool:ping', reason: 'ok' }),
+      onTrace,
+      identityResolver: () => resolverIdentity,
+    })
+    registry.register({ name: 'ping', execute: () => ({ ok: true }) })
+
+    await registry.execute('ping', {}, explicitIdentity)
+
+    expect(onTrace).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'tool.executed', agent: explicitIdentity })
     )
   })
 })
