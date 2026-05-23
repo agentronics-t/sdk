@@ -4,6 +4,11 @@ const LOCAL_DEV_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
+  // Vite's default dev server — what an SDK consumer's app boots on when
+  // they run `pnpm dev` in their own project against a local gateway.
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
 ]
 
 const PRODUCTION_DEFAULT_ORIGINS = [
