@@ -47,14 +47,14 @@ describe('init', () => {
   })
 
   it('client.detect() returns null on a clean environment', async () => {
-    const client = init({ publishableKey: 'agtx_pk_demo_1234567890' })
+    const client = init({ publishableKey: 'agtx_pk_demo_1234567890', autoDetect: false })
     const identity = await client.detect({ webmcp: { pollMs: 0 } })
     expect(identity).toBeNull()
     expect(client.traces().at(-1)?.type).toBe('agent.missed')
   })
 
   it('client.detect() returns a presented identity when nothing else fires', async () => {
-    const client = init({ publishableKey: 'agtx_pk_demo_1234567890' })
+    const client = init({ publishableKey: 'agtx_pk_demo_1234567890', autoDetect: false })
     client.presentIdentity({ class: 'screenshot', vendor: 'browser-use', token: 'tok_abcdef12' })
     const identity = await client.detect({ webmcp: { pollMs: 0 } })
     expect(identity?.trust).toBe('declared')
@@ -62,7 +62,7 @@ describe('init', () => {
   })
 
   it('clearIdentity() removes the staged claim', async () => {
-    const client = init({ publishableKey: 'agtx_pk_demo_1234567890' })
+    const client = init({ publishableKey: 'agtx_pk_demo_1234567890', autoDetect: false })
     client.presentIdentity({ class: 'dom', vendor: 'acme', token: 'tok_abcdef12' })
     client.clearIdentity()
     expect(client.presentedIdentity()).toBeNull()
@@ -124,10 +124,68 @@ describe('init', () => {
   })
 
   it('can disable tracing', async () => {
-    const client = init({ publishableKey: 'agtx_pk_demo_1234567890', trace: { enabled: false } })
+    const client = init({
+      publishableKey: 'agtx_pk_demo_1234567890',
+      trace: { enabled: false },
+      autoDetect: false,
+    })
     await client.detect({ webmcp: { pollMs: 0 } })
     client.memory.set('cart', { items: 1 })
     expect(client.traces()).toHaveLength(0)
+  })
+
+  it('autoDetect populates agentContext on init by default', async () => {
+    const client = init({
+      publishableKey: 'agtx_pk_demo_1234567890',
+      // Use a fast-resolving config so the test doesn't wait for the default
+      // 500ms WebMCP poll.
+      autoDetect: { webmcp: { pollMs: 0 } },
+    })
+    await client.ready
+    // jsdom doesn't expose navigator.webdriver, so detection should return
+    // null — but the trace is emitted, proving the cycle ran.
+    expect(client.agentContext.snapshot().source).toBe('detect')
+    expect(client.traces().some((t) => t.type === 'agent.missed')).toBe(true)
+  })
+
+  it('autoDetect=false skips the boot detection cycle', async () => {
+    const client = init({ publishableKey: 'agtx_pk_demo_1234567890', autoDetect: false })
+    await client.ready
+    expect(client.agentContext.snapshot().source).toBe('initial')
+    expect(client.traces().some((t) => t.type === 'agent.detected')).toBe(false)
+  })
+
+  it('tools.execute() called without identity uses the agentContext snapshot', async () => {
+    const client = init({ publishableKey: 'agtx_pk_demo_1234567890', autoDetect: false })
+    client.registerTool({
+      name: 'cart.add',
+      authz: { minTrust: 'detected', allowedClasses: [], decision: 'allow' },
+      execute: () => ({ ok: true }),
+    })
+    // Simulate detection populating agentContext (what autoDetect does in
+    // production when an agent is present).
+    client.presentIdentity({ class: 'webmcp', vendor: 'anthropic', token: 'tok_abcdef12' })
+
+    await client.tools.execute('cart.add', {})
+
+    const executed = client.traces().find((t) => t.type === 'tool.executed')
+    expect(executed?.agent?.class).toBe('webmcp')
+    expect(executed?.agent?.vendor).toBe('anthropic')
+  })
+
+  it('explicit null identity overrides the ambient resolver (anonymous call)', async () => {
+    const client = init({ publishableKey: 'agtx_pk_demo_1234567890', autoDetect: false })
+    // No authz on the tool — every caller (human or agent) is allowed.
+    client.registerTool({
+      name: 'cart.add',
+      execute: () => ({ ok: true }),
+    })
+    client.presentIdentity({ class: 'webmcp', vendor: 'anthropic', token: 'tok_abcdef12' })
+
+    await client.tools.execute('cart.add', {}, null)
+
+    const executed = client.traces().find((t) => t.type === 'tool.executed')
+    expect(executed?.agent).toBeNull()
   })
 
   it('exposes site memory and emits memory.updated traces on provide', () => {

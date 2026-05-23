@@ -72,6 +72,19 @@ export interface InitOptions {
   auth?: AuthContext
   progression?: ProgressionConfig
   tools?: GovernedTool[]
+  /**
+   * Run agent detection automatically on init and keep the resulting
+   * identity in agentContext so every subsequent tools.execute() call gets
+   * attributed without the host page passing identity through. Default
+   * `true` — opt out with `false` for privacy-mode hosts, or pass
+   * DetectAgentOptions to tune the detectors (e.g. raise the DOM threshold).
+   *
+   * The first detection cycle runs synchronously where possible (DOM
+   * heuristics) and continues asynchronously for WebMCP polling, so very
+   * early click handlers may see identity=null for a single frame; the
+   * `ready` promise on the returned client resolves once the cycle finishes.
+   */
+  autoDetect?: boolean | DetectAgentOptions
   trace?: {
     enabled?: boolean
     bufferSize?: number
@@ -100,6 +113,13 @@ export interface AgentronicsClient {
   readonly tools: ToolRegistry
   readonly progression: ProgressionStore | null
   readonly webmcp: WebMcpAdapter
+  /**
+   * Resolves once the initial autoDetect cycle finishes. Rejects only if the
+   * autoDetect configuration itself is invalid; detection failures resolve to
+   * `null` (treated as "human or undetectable agent"). When `autoDetect` was
+   * disabled the promise resolves immediately to `null`.
+   */
+  readonly ready: Promise<AgentIdentity | null>
   detect(options?: DetectAgentOptions): Promise<AgentIdentity | null>
   authenticate(input: AuthInput): Promise<AgentIdentity | null>
   presentIdentity(input: PresentIdentityOptions): PresentedIdentity
@@ -274,6 +294,11 @@ export const init = (options: InitOptions): AgentronicsClient => {
     setPolicies: (rules) => policyEngine.set(rules),
     listPolicies: () => policyEngine.list(),
     onTrace: emitTrace,
+    // Every tools.execute() call without an explicit identity gets the
+    // current detected/declared/authenticated agent. Button-bound tools
+    // become attributable without their handlers having to know about
+    // agents.
+    identityResolver: () => agentContext.snapshot().identity,
   })
   for (const tool of options.tools ?? []) tools.register(tool)
 
@@ -298,16 +323,59 @@ export const init = (options: InitOptions): AgentronicsClient => {
   const handleToolInvoked = (toolName: string) => {
     if (!progression) return
     const transition = progression.notify(toolName)
-    if (transition.changed) webmcp.publish(surfaceFor(null))
+    if (transition.changed) webmcp.publish(surfaceFor(agentContext.snapshot().identity))
+  }
+
+  // Fallback identity used only when no detection has fired yet AND the call
+  // arrives through navigator.modelContext — a call through that channel is
+  // by definition an agent call, even if the specific vendor wasn't matched.
+  const fallbackWebMcpIdentity: AgentIdentity = {
+    class: 'webmcp',
+    trust: 'detected',
+    confidence: 1,
+    vendor: null,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+    detectionVersion: '2026.04',
+    signals: { source: 'navigator.modelContext' },
   }
 
   const webmcp = createWebMcpAdapter({
     invoke: async (tool, input) => {
-      const result = await tools.execute(tool.name, input, null)
+      const identity = agentContext.snapshot().identity ?? fallbackWebMcpIdentity
+      const result = await tools.execute(tool.name, input, identity)
       handleToolInvoked(tool.name)
       return result
     },
   })
+
+  // When the ambient identity changes (late WebMCP polyfill, declared
+  // identity, successful authenticate()), re-publish the WebMCP surface so
+  // any agent currently bound to navigator.modelContext sees the
+  // identity-gated tool set rather than the stale anonymous one.
+  agentContext.subscribe((snapshot) => {
+    if (!webmcp.available()) return
+    webmcp.publish(surfaceFor(snapshot.identity))
+  })
+
+  // Kick off the initial detection cycle if the host opted in. Default is
+  // on so /traces is populated with class/trust/signals without the host
+  // page having to call detect() manually before each interaction.
+  const autoDetectOption = options.autoDetect ?? true
+  const ready: Promise<AgentIdentity | null> = autoDetectOption === false
+    ? Promise.resolve(null)
+    : (async () => {
+        const detectOpts: DetectAgentOptions =
+          autoDetectOption === true ? {} : autoDetectOption
+        try {
+          return await detect(detectOpts)
+        } catch (err) {
+          // Detection problems shouldn't crash the host's init() — log when
+          // debug is on, otherwise swallow and treat as "human or
+          // undetectable agent."
+          if (debug) console.warn('[agentronics] autoDetect failed:', err)
+          return null
+        }
+      })()
 
   return Object.freeze({
     publishableKey,
@@ -325,6 +393,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
     tools,
     progression,
     webmcp,
+    ready,
     detect,
     authenticate: async (input: AuthInput) => {
       const identity = await auth.authenticate(input)

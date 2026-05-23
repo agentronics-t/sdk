@@ -18,6 +18,18 @@ export interface ToolRegistryOptions {
   setPolicies?: (rules: PolicyRule[]) => void
   listPolicies?: () => PolicyRule[]
   onTrace?: (input: TraceInput) => void
+  /**
+   * Resolves the ambient agent identity for `execute()` calls that don't pass
+   * one explicitly. The SDK wires this to the agentContext snapshot so a
+   * button-bound tool fires with the detected agent attached — without
+   * forcing every consumer to thread identity through their click handlers.
+   *
+   * Semantics:
+   * - `execute(name, input)` or `execute(name, input, undefined)` → resolver
+   * - `execute(name, input, null)` → respected (caller wants anonymous attribution)
+   * - `execute(name, input, identity)` → respected
+   */
+  identityResolver?: () => AgentIdentity | null
 }
 
 export interface ToolRegistry {
@@ -40,6 +52,7 @@ export const createToolRegistry = ({
   setPolicies,
   listPolicies,
   onTrace,
+  identityResolver,
 }: ToolRegistryOptions): ToolRegistry => {
   const tools = new Map<string, GovernedTool>()
   const disabled = new Set<string>()
@@ -105,8 +118,14 @@ export const createToolRegistry = ({
     async execute<Input, Output>(
       name: string,
       input: Input,
-      identity: AgentIdentity | null = null
+      identity?: AgentIdentity | null
     ): Promise<Output> {
+      // `undefined` means "use the ambient identity"; explicit `null` means
+      // "anonymous". This lets button handlers stay as `tools.execute(name,
+      // input)` while still being attributed to whatever detect()/declare()
+      // resolved into agentContext.
+      const resolvedIdentity =
+        identity === undefined ? (identityResolver?.() ?? null) : identity
       const tool = tools.get(name) as GovernedTool<Input, Output> | undefined
       if (!tool) throw new Error(`Tool "${name}" is not registered.`)
       if (disabled.has(name)) {
@@ -115,12 +134,12 @@ export const createToolRegistry = ({
           ruleId: `tool:${name}`,
           reason: 'Tool is disabled.',
         }
-        onTrace?.({ type: 'tool.executed', tool: name, agent: identity, policy, outcome: 'blocked' })
+        onTrace?.({ type: 'tool.executed', tool: name, agent: resolvedIdentity, policy, outcome: 'blocked' })
         throw new Error(policy.reason)
       }
-      const policy = await evaluate(name, { identity })
+      const policy = await evaluate(name, { identity: resolvedIdentity })
       if (policy.decision === 'deny') {
-        onTrace?.({ type: 'tool.executed', tool: name, agent: identity, policy, outcome: 'blocked' })
+        onTrace?.({ type: 'tool.executed', tool: name, agent: resolvedIdentity, policy, outcome: 'blocked' })
         throw new Error(policy.reason)
       }
       // Time the execution and trace the outcome either way — a tool that
@@ -128,11 +147,11 @@ export const createToolRegistry = ({
       // analytics surfaces need both the latency and the error.
       const start = Date.now()
       try {
-        const output = await tool.execute(input, { identity })
+        const output = await tool.execute(input, { identity: resolvedIdentity })
         onTrace?.({
           type: 'tool.executed',
           tool: name,
-          agent: identity,
+          agent: resolvedIdentity,
           policy,
           outcome: 'success',
           durationMs: Date.now() - start,
@@ -142,7 +161,7 @@ export const createToolRegistry = ({
         onTrace?.({
           type: 'tool.executed',
           tool: name,
-          agent: identity,
+          agent: resolvedIdentity,
           policy,
           outcome: 'error',
           durationMs: Date.now() - start,
