@@ -24,7 +24,17 @@ interface WindowLike {
 const resolveProvider = (options: WebMcpAdapterOptions): WebMcpProvider | null => {
   if (options.provider) return options.provider
   const win = options.doc?.defaultView ?? (typeof globalThis !== 'undefined' ? (globalThis as WindowLike) : null)
-  return win?.navigator?.modelContext ?? null
+  const candidate = win?.navigator?.modelContext
+  if (!candidate) return null
+  // Some polyfills / browser extensions patch `navigator.modelContext` with a
+  // different shape (e.g. `setTools` instead of `provideContext`). Only accept
+  // the object as a provider when it exposes the method we actually call;
+  // otherwise the rest of the SDK falls back to no-op publishing instead of
+  // throwing `provideContext is not a function` at runtime.
+  if (typeof (candidate as Partial<WebMcpProvider>).provideContext !== 'function') {
+    return null
+  }
+  return candidate
 }
 
 const toDescriptor = (
