@@ -82,12 +82,37 @@ export const createMemoryRoutes = ({
   )
 
   app.get('/v1/sites/:siteId/.well-known/agent-context.json', async (c) => {
+    // Public discovery endpoint — intentionally unauthenticated. We only
+    // expose a sanitized subset of site memory so operators can put
+    // sensitive prompts/policies/page-contexts in memory without leaking
+    // them to anyone who guesses the siteId. Anything not listed here is
+    // private to authenticated callers via GET /v1/sites/:siteId/memory.
     const siteId = c.req.param('siteId')
     const document = await storage.memory.get(siteId)
     const { memory, etag } = document ? document : emptyMemory()
+    const publicMemory = {
+      version: memory.version,
+      siteMap: memory.siteMap
+        ? {
+            pages: (memory.siteMap.pages ?? []).map((p) => ({
+              path: p.path,
+              ...(p.name ? { name: p.name } : {}),
+              ...(p.purpose ? { purpose: p.purpose } : {}),
+            })),
+            ...(memory.siteMap.navigation ? { navigation: memory.siteMap.navigation } : {}),
+          }
+        : undefined,
+      workflows: Object.fromEntries(
+        Object.entries(memory.workflows ?? {}).map(([name, wf]) => [
+          name,
+          { steps: wf.steps },
+        ])
+      ),
+      ...(memory.updatedAt ? { updatedAt: memory.updatedAt } : {}),
+    }
     c.header('etag', etag)
     c.header('cache-control', 'public, max-age=300')
-    return c.json(memory)
+    return c.json(publicMemory)
   })
 
   return app

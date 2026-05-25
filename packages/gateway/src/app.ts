@@ -17,6 +17,7 @@ import { createWebhookRoutes } from './routes/webhooks.js'
 import { createVerifyRoutes } from './routes/verify.js'
 import { createSiteRoutes } from './routes/sites.js'
 import { createSiteProtocolConfigRoutes } from './routes/siteProtocolConfig.js'
+import { createAdminRoutes } from './routes/admin.js'
 import { createInMemoryStorage } from './storage/memory.js'
 import type { Storage } from './storage/types.js'
 import { GATEWAY_LANDING_HTML } from './landing.js'
@@ -50,13 +51,26 @@ export const createApp = ({
       maxAge: 600,
     })
   )
+  const trustForwardedHeaders = env.TRUSTED_PROXY_IPS.length > 0
   app.use(
     '/v1/traces',
-    createRateLimit({ storage, scope: 'traces', windowSeconds: 60, max: 600 })
+    createRateLimit({
+      storage,
+      scope: 'traces',
+      windowSeconds: 60,
+      max: 600,
+      trustForwardedHeaders,
+    })
   )
   app.use(
     '/v1/api-keys',
-    createRateLimit({ storage, scope: 'api-keys', windowSeconds: 60, max: 30 })
+    createRateLimit({
+      storage,
+      scope: 'api-keys',
+      windowSeconds: 60,
+      max: 30,
+      trustForwardedHeaders,
+    })
   )
 
   app.get('/', (c) => {
@@ -90,6 +104,7 @@ export const createApp = ({
   app.route('/', createSiteRoutes({ storage, resolveSession }))
   app.route('/', createSiteProtocolConfigRoutes({ storage, resolveSession }))
   app.route('/', createVerifyRoutes({ storage }))
+  app.route('/', createAdminRoutes({ cronSecret: env.CRON_SECRET ?? null }))
   app.route(
     '/',
     createWebhookRoutes({
@@ -102,8 +117,15 @@ export const createApp = ({
 
   app.notFound((c) => c.json({ error: 'not_found', path: c.req.path }, 404))
   app.onError((err, c) => {
-    console.error('[gateway]', err)
-    return c.json({ error: 'internal_error', message: err.message }, 500)
+    // Always log full detail server-side. Only leak err.message to clients
+    // outside production — Drizzle/Zod/Postgres errors otherwise expose
+    // schema and internal paths to unauthenticated callers.
+    const requestId = c.req.header('x-request-id') ?? null
+    console.error('[gateway]', { requestId, path: c.req.path, err })
+    const body: Record<string, unknown> = { error: 'internal_error' }
+    if (requestId) body.requestId = requestId
+    if (env.NODE_ENV !== 'production') body.message = err.message
+    return c.json(body, 500)
   })
 
   return app
