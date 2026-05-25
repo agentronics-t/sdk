@@ -1,3 +1,4 @@
+import { auditId } from '../util/ids.js'
 import { Hono } from 'hono'
 import {
   VerificationRequest,
@@ -51,7 +52,7 @@ export const createVerifyRoutes = ({ storage }: { storage: Storage }) => {
 
       const audit = async (result: VerificationResult, protocol: AuthProtocol) => {
         await storage.audit.insert({
-          id: `aud_${Math.random().toString(36).slice(2, 12)}`,
+          id: auditId(),
           orgId: auth.orgId,
           actor: auth.apiKeyId,
           action: `verify.${protocol}`,

@@ -44,7 +44,10 @@ export const TraceEvent = z.object({
 export type TraceEvent = z.infer<typeof TraceEvent>
 
 export const TraceBatch = z.object({
-  publishableKey: z.string(),
+  // Optional and never trusted by the gateway — auth is always via the
+  // Bearer header. The field stays in the schema for SDK back-compat
+  // (older SDKs still send it). Newer SDKs may omit it.
+  publishableKey: z.string().optional(),
   events: z.array(TraceEvent).min(1).max(100),
 })
 export type TraceBatch = z.infer<typeof TraceBatch>

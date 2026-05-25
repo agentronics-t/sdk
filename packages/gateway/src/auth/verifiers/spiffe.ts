@@ -120,6 +120,7 @@ export const verifySpiffeJwt = async (
   const { payload } = await jwtVerify(token, jwks, {
     audience: config.audiences,
     algorithms: SPIFFE_ALLOWED_ALGS,
+    clockTolerance: 120,
   })
   const spiffeId = parseSpiffeId(payload.sub)
   if (!spiffeId) throw new Error('spiffe_invalid_sub')

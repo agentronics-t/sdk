@@ -1,3 +1,4 @@
+import { auditId } from '../util/ids.js'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { clerkAuth, type ClerkAuthOptions } from '../middleware/clerkAuth.js'
@@ -26,7 +27,7 @@ export const createApiKeyRoutes = ({
       label: parsed.data.label,
     })
     await storage.audit.insert({
-      id: `aud_${Math.random().toString(36).slice(2, 12)}`,
+      id: auditId(),
       orgId: auth.orgId,
       actor: auth.apiKeyId,
       action: 'api_keys.create',
@@ -68,7 +69,7 @@ export const createApiKeyRoutes = ({
     const occurredAt = new Date().toISOString()
     await storage.apiKeys.revoke(id, occurredAt)
     await storage.audit.insert({
-      id: `aud_${Math.random().toString(36).slice(2, 12)}`,
+      id: auditId(),
       orgId: auth.orgId,
       actor: auth.apiKeyId,
       action: 'api_keys.revoke',
