@@ -1,4 +1,4 @@
-import { integer, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 // Tables match the storage interfaces in `./types.ts`. The in-memory adapter is
 // authoritative for tests; the drizzle adapter (wired in `./postgres.ts`,
@@ -99,10 +99,19 @@ export const rateLimitWindows = pgTable('rate_limit_windows', {
 // `googleTrustDomains` field — no separate row. Config shape is encoded
 // in jsonb and validated at write time by the dashboard / SQL inserter;
 // types live in `./types.ts`.
-export const siteProtocolConfig = pgTable('site_protocol_config', {
-  id: text('id').primaryKey(),
-  siteId: text('site_id').notNull(),
-  protocol: text('protocol').notNull(), // 'sso' | 'spiffe' | 'mtls'
-  config: jsonb('config').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const siteProtocolConfig = pgTable(
+  'site_protocol_config',
+  {
+    id: text('id').primaryKey(),
+    siteId: text('site_id').notNull(),
+    protocol: text('protocol').notNull(), // 'sso' | 'spiffe' | 'mtls'
+    config: jsonb('config').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    siteProtocolUnique: uniqueIndex('site_protocol_config_site_protocol_idx').on(
+      table.siteId,
+      table.protocol
+    ),
+  })
+)

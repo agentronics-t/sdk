@@ -28,7 +28,10 @@ describe('SDK ↔ Gateway round-trip', () => {
       updatedAt: new Date().toISOString(),
     })
     await fixture.storage.memory.put(fixture.orgA.siteId, {
-      memory: { policies: { shipping: 'Free over $50' } } as never,
+      memory: {
+        policies: { shipping: 'Free over $50' },
+        siteMap: { pages: [{ path: '/cart', name: 'Cart' }] },
+      } as never,
       etag: 'W/"mem"',
       updatedAt: new Date().toISOString(),
     })
@@ -89,6 +92,10 @@ describe('SDK ↔ Gateway round-trip', () => {
         return fixture.fetcher(rewritten, init)
       },
     })
-    expect(wellKnown?.policies.shipping).toBe('Free over $50')
+    // .well-known returns only the sanitized public subset: siteMap is
+    // exposed, policies are stripped (the SiteMemory schema fills the
+    // missing field with `{}` after parsing, which is what we assert).
+    expect(wellKnown?.siteMap?.pages[0]?.path).toBe('/cart')
+    expect(wellKnown?.policies).toEqual({})
   })
 })

@@ -25,7 +25,15 @@ const Env = z.object({
   // they want to lock down all browser callers" from "operator forgot,
   // please apply the sensible default for the current NODE_ENV".
   ALLOWED_ORIGINS: z.string().optional(),
+  // Required for /v1/cron/* endpoints. Min length matches the random-token
+  // strength operators typically generate (>= 128 bits of entropy).
   CRON_SECRET: z.string().min(16).optional(),
+  // Comma-separated list of proxy IPs/CIDRs that the gateway sits behind.
+  // When set, x-forwarded-for / x-real-ip are honoured for rate-limit
+  // keying; when unset, those headers are ignored and the rate limiter
+  // falls back to the API key id or 'anonymous'. Prevents header-spoof
+  // bypass on internet-facing deployments.
+  TRUSTED_PROXY_IPS: z.string().optional(),
   SEED_FIXTURE: z
     .union([z.literal('true'), z.literal('false')])
     .optional()
@@ -33,7 +41,10 @@ const Env = z.object({
 })
 
 type RawEnv = z.infer<typeof Env>
-export type Env = Omit<RawEnv, 'ALLOWED_ORIGINS'> & { ALLOWED_ORIGINS: string[] }
+export type Env = Omit<RawEnv, 'ALLOWED_ORIGINS' | 'TRUSTED_PROXY_IPS'> & {
+  ALLOWED_ORIGINS: string[]
+  TRUSTED_PROXY_IPS: string[]
+}
 
 const splitOrigins = (raw: string): string[] =>
   raw
@@ -65,5 +76,6 @@ export const loadEnv = (source: NodeJS.ProcessEnv = process.env): Env => {
   return {
     ...parsed.data,
     ALLOWED_ORIGINS: resolveAllowedOrigins(parsed.data.ALLOWED_ORIGINS, parsed.data.NODE_ENV),
+    TRUSTED_PROXY_IPS: splitOrigins(parsed.data.TRUSTED_PROXY_IPS ?? ''),
   }
 }

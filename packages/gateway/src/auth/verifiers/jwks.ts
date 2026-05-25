@@ -19,5 +19,15 @@ export const getRemoteJwks = (jwksUri: string): JWKSet => {
   return set
 }
 
-// Visible for tests so they can reset between runs.
-export const __resetJwksCache = (): void => cache.clear()
+// Operator-callable: drop one cached JWKSet (e.g. after an emergency key
+// rotation at the IdP). Without this, a compromised key could remain
+// trusted for the cacheMaxAge window above.
+export const invalidateRemoteJwks = (jwksUri: string): boolean =>
+  cache.delete(jwksUri)
+
+// Operator-callable: drop every cached JWKSet. Used by the admin route
+// and by tests between runs.
+export const invalidateAllRemoteJwks = (): void => cache.clear()
+
+// Legacy alias kept for tests that imported the underscore-prefixed name.
+export const __resetJwksCache = invalidateAllRemoteJwks

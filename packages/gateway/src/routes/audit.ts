@@ -7,7 +7,17 @@ import type { AuditEntry, Storage } from '../storage/types.js'
 const Body = z.object({ format: z.enum(['json', 'csv']).default('json') })
 
 const csvEscape = (value: unknown): string => {
-  const text = value === null || value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value)
+  const raw =
+    value === null || value === undefined
+      ? ''
+      : typeof value === 'string'
+        ? value
+        : JSON.stringify(value)
+  // Prefix a single quote to neutralize Excel/Sheets formula execution when
+  // an audit field starts with =, +, -, @, tab, or CR. Audit fields come
+  // from tool names, siteIds, and user-supplied metadata, all of which are
+  // attacker-controllable.
+  const text = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw
   if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`
   return text
 }
@@ -46,6 +56,7 @@ export const createAuditRoutes = ({
         c.header('content-disposition', `attachment; filename="audit-${auth.orgId}.csv"`)
         return c.body(renderCsv(entries))
       }
+      c.header('content-disposition', `attachment; filename="audit-${auth.orgId}.json"`)
       return c.json({ entries })
     }
   )

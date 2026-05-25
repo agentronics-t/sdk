@@ -44,27 +44,72 @@ export interface VerifySpiffeOptions {
 interface SpiffeBundleEntry {
   bundle: JWTVerifyGetKey
   expires: number
+  etag: string | null
+  lastModified: string | null
 }
-const BUNDLE_TTL_MS = 60 * 60 * 1000 // 1h
+// 15 minutes — short enough that a one-time bundle compromise (poisoned
+// CDN edge, MITM) has a bounded blast radius; long enough to amortize
+// the fetch on hot paths.
+const BUNDLE_TTL_MS = 15 * 60 * 1000
 const bundleCache = new Map<string, SpiffeBundleEntry>()
+
+const assertHttps = (endpoint: string): void => {
+  const url = new URL(endpoint)
+  // Allow http only for localhost (tests, dev SPIRE agents). Production
+  // bundle URIs must be https — anything else is a MITM-by-design.
+  if (
+    url.protocol !== 'https:' &&
+    !(url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))
+  ) {
+    throw new Error(`spiffe_bundle_insecure_scheme:${url.protocol}`)
+  }
+}
 
 const fetchSpiffeBundle = async (
   endpoint: string,
   fetcher: typeof fetch
 ): Promise<JWTVerifyGetKey> => {
+  assertHttps(endpoint)
   const cached = bundleCache.get(endpoint)
   if (cached && cached.expires > Date.now()) return cached.bundle
-  const res = await fetcher(endpoint)
-  if (!res.ok) throw new Error(`spiffe_bundle_fetch_failed:${res.status}`)
+  // Conditional revalidation: if the server says 304, keep the cached
+  // bundle and extend its lease. A fresh 200 replaces the keys.
+  const headers: Record<string, string> = {}
+  if (cached?.etag) headers['if-none-match'] = cached.etag
+  if (cached?.lastModified) headers['if-modified-since'] = cached.lastModified
+  let res: Response
+  try {
+    res = await fetcher(endpoint, { headers })
+  } catch (err) {
+    console.warn('[spiffe] bundle fetch failed:', endpoint, (err as Error)?.message)
+    if (cached) return cached.bundle
+    throw err
+  }
+  if (res.status === 304 && cached) {
+    cached.expires = Date.now() + BUNDLE_TTL_MS
+    return cached.bundle
+  }
+  if (!res.ok) {
+    console.warn('[spiffe] bundle fetch status:', endpoint, res.status)
+    if (cached) return cached.bundle
+    throw new Error(`spiffe_bundle_fetch_failed:${res.status}`)
+  }
   const doc = (await res.json()) as { keys?: JWK[] }
   if (!Array.isArray(doc.keys)) throw new Error('spiffe_bundle_missing_keys')
   const normalized: JWK[] = doc.keys
     .filter((key) => key.use === 'jwt-svid' || key.use === 'sig' || key.use === undefined)
     .map((key) => (key.use === 'jwt-svid' ? { ...key, use: 'sig' } : key))
   const bundle = createLocalJWKSet({ keys: normalized })
-  bundleCache.set(endpoint, { bundle, expires: Date.now() + BUNDLE_TTL_MS })
+  bundleCache.set(endpoint, {
+    bundle,
+    expires: Date.now() + BUNDLE_TTL_MS,
+    etag: res.headers.get('etag'),
+    lastModified: res.headers.get('last-modified'),
+  })
   return bundle
 }
+
+export const __resetSpiffeBundleCache = (): void => bundleCache.clear()
 
 export const verifySpiffeJwt = async (
   token: string,

@@ -108,20 +108,14 @@ export const createPostgresStorage = (databaseUrl: string): Storage => {
         }))
       },
       async delete(siteId) {
-        // Best-effort cascade for per-site protocol config rows. The
-        // site_protocol_config table only exists in environments where the
-        // schema has been pushed (it's not yet in the canonical migration
-        // set); swallow the error so the primary sites.delete still succeeds.
-        try {
-          await db
-            .delete(schema.siteProtocolConfig)
-            .where(eq(schema.siteProtocolConfig.siteId, siteId))
-        } catch (err) {
-          console.warn(
-            '[gateway] siteProtocolConfig cascade skipped:',
-            (err as Error)?.message
-          )
-        }
+        // Cascade per-site protocol config rows, then the site itself.
+        // Both tables are part of the canonical migration set
+        // (drizzle/0001_site_protocol_config.sql); a failure here means
+        // the DB is mis-migrated and should fail loudly rather than leave
+        // orphans.
+        await db
+          .delete(schema.siteProtocolConfig)
+          .where(eq(schema.siteProtocolConfig.siteId, siteId))
         await db.delete(schema.sites).where(eq(schema.sites.id, siteId))
       },
     },
