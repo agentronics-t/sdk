@@ -1,4 +1,5 @@
 import { AgentClass } from '@agentronics/protocol'
+import { SDK_VERSION } from "../../version.js"
 import type { AuthMethod } from '../engine.js'
 
 export const xAgentHeader = (): AuthMethod => ({
@@ -14,7 +15,7 @@ export const xAgentHeader = (): AuthMethod => ({
       confidence: proof ? 1 : 0.8,
       vendor,
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      detectionVersion: '2026.04',
+      detectionVersion: SDK_VERSION,
       signals: { xAgentHeader: true, hasProof: Boolean(proof) },
     }
   },

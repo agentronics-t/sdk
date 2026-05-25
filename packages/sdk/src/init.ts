@@ -8,6 +8,7 @@ import {
   type TraceEvent,
 } from '@agentronics/protocol'
 import { detectAgent, type DetectAgentOptions } from './detection/index.js'
+import { SDK_VERSION } from './version.js'
 import {
   createIdentityStore,
   type PresentedIdentity,
@@ -335,7 +336,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
     confidence: 1,
     vendor: null,
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
-    detectionVersion: '2026.04',
+    detectionVersion: SDK_VERSION,
     signals: { source: 'navigator.modelContext' },
   }
 

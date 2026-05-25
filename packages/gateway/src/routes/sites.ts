@@ -1,3 +1,4 @@
+import { auditId } from '../util/ids.js'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { clerkAuth, type ClerkAuthOptions } from '../middleware/clerkAuth.js'
@@ -11,9 +12,6 @@ const Body = z.object({
     .regex(/^[a-zA-Z0-9._-]+$/, 'siteId may only contain letters, digits, . _ -'),
   name: z.string().min(1).max(120),
 })
-
-const auditId = (): string =>
-  `aud_${Math.random().toString(36).slice(2, 12)}`
 
 export const createSiteRoutes = ({
   storage,

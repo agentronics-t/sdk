@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { bodyLimit } from 'hono/body-limit'
 import { loadEnv, type Env } from './env.js'
 import { pingDatabase } from './db.js'
 import { securityHeaders } from './middleware/securityHeaders.js'
@@ -41,6 +42,14 @@ export const createApp = ({
 
   app.use('*', logger())
   app.use('*', securityHeaders())
+  // Cap request bodies so a single oversized payload can't OOM the
+  // function. Traces are batched (up to 100 events) and can legitimately
+  // be ~MB; 5 MB leaves comfortable headroom. Schema validation on the
+  // smaller routes (policies, memory, api-keys) keeps them bounded.
+  app.use(
+    '/v1/traces',
+    bodyLimit({ maxSize: 5 * 1024 * 1024, onError: (c) => c.json({ error: 'payload_too_large' }, 413) })
+  )
   app.use(
     '/v1/*',
     cors({

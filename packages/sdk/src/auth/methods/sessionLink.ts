@@ -1,4 +1,5 @@
 import type { AuthMethod } from '../engine.js'
+import { SDK_VERSION } from "../../version.js"
 
 export const sessionLink = (): AuthMethod => ({
   name: 'sessionLink',
@@ -11,7 +12,7 @@ export const sessionLink = (): AuthMethod => ({
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'session-link',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      detectionVersion: '2026.04',
+      detectionVersion: SDK_VERSION,
       signals: {
         sessionLink: true,
         linkedUserId: input.linkedUserId ?? null,

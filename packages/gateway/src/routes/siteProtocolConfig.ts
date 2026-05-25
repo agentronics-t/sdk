@@ -1,3 +1,4 @@
+import { auditId } from '../util/ids.js'
 import { Hono } from 'hono'
 import type { z } from 'zod'
 import {
@@ -15,9 +16,6 @@ const BODY_BY_PROTOCOL: Record<z.infer<typeof SiteProtocolName>, z.ZodTypeAny> =
   spiffe: SpiffeConfigInput,
   mtls: MtlsConfigInput,
 }
-
-const auditId = (): string =>
-  `aud_${Math.random().toString(36).slice(2, 12)}`
 
 export const createSiteProtocolConfigRoutes = ({
   storage,

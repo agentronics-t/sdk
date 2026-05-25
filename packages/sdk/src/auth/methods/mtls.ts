@@ -1,4 +1,5 @@
 import type { AuthMethod } from '../engine.js'
+import { SDK_VERSION } from "../../version.js"
 
 // mTLS via x-forwarded-client-cert (XFCC). Browser builds never trigger
 // this — JavaScript cannot inspect its own TLS state. Node companions
@@ -18,7 +19,7 @@ export const mtls = (): AuthMethod => ({
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'mtls',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      detectionVersion: '2026.04',
+      detectionVersion: SDK_VERSION,
       signals: {
         mtls: true,
         subject: verified?.subject ?? null,

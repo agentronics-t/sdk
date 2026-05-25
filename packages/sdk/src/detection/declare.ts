@@ -1,4 +1,5 @@
 import { AgentClass, type AgentIdentity, type TrustLevel } from '@agentronics/protocol'
+import { SDK_VERSION } from "../version.js"
 
 export interface DeclareAgentInput {
   class: 'webmcp' | 'dom' | 'screenshot'
@@ -17,7 +18,7 @@ export const declareAgent = (input: DeclareAgentInput): AgentIdentity => {
     confidence: 1,
     vendor: input.vendor,
     userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-    detectionVersion: '2026.04',
+    detectionVersion: SDK_VERSION,
     signals: {
       declared: true,
       hasVerificationToken: Boolean(input.verificationToken),
