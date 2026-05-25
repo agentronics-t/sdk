@@ -49,6 +49,9 @@ const parseEntry = (raw: string): XfccEntry => {
     const value = stripQuotes(pair.slice(eq + 1).trim())
     switch (key) {
       case 'by':
+        // `by` is advisory — it identifies the proxy that injected the
+        // header but is never trusted for authn/authz decisions. Only
+        // the cert + chain are verified downstream.
         entry.by = value
         break
       case 'hash':

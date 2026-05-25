@@ -8,7 +8,7 @@ const webmcpIdentity = (overrides: Partial<AgentIdentity> = {}): AgentIdentity =
   confidence: 1,
   vendor: null,
   userAgent: null,
-  detectionVersion: '2026.04',
+  detectionVersion: '0.1.2',
   signals: {},
   ...overrides,
 })

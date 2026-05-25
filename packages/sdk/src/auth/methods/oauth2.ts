@@ -1,4 +1,5 @@
 import type { AuthMethod } from '../engine.js'
+import { SDK_VERSION } from "../../version.js"
 
 export const oauth2 = (): AuthMethod => ({
   name: 'oauth2',
@@ -11,7 +12,7 @@ export const oauth2 = (): AuthMethod => ({
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'oauth2',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      detectionVersion: '2026.04',
+      detectionVersion: SDK_VERSION,
       signals: {
         oauth2: true,
         subject: input.oauth2Subject ?? null,

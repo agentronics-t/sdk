@@ -110,6 +110,18 @@ Once detection is working, continue to:
 
 Each of those has its own guide in this docs site. Welcome to Agentronics.
 
+## Trust levels
+
+Every identity carries a `trust` field that policies can match on. The
+levels (lowest → highest) are:
+
+- `detected` — the SDK observed signals (WebMCP polyfill, `navigator.webdriver`, CDP keys) but did not verify anything cryptographically.
+- `declared` — the host page called `client.presentIdentity({...})`. **The browser cannot verify a declared claim, and a malicious host page can claim any identity it likes.** Treat `declared` as "the page told us it's an agent" — useful for hinting, not for authorisation.
+- `verified` — the gateway successfully verified a cryptographic credential (OIDC ID token, SPIFFE JWT-SVID, mTLS XFCC, etc.). This is the only level you should gate dangerous tools on.
+- `linked` — the agent is verified *and* matched to a server-side session.
+
+If your dashboard renders agent activity, surface the trust level next to the vendor so reviewers can tell a self-declared "claude" apart from a verified one.
+
 ## Links
 
 - [Documentation](https://docs.agentronics.dev)

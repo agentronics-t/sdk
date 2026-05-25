@@ -29,7 +29,7 @@ describe('detectWebMcp', () => {
       trust: 'detected',
       confidence: 1,
       vendor: 'claude-extension',
-      detectionVersion: '2026.04',
+      detectionVersion: '0.1.2',
     })
     expect(result?.signals).toMatchObject({ webmcp: true, toolCount: 2 })
   })

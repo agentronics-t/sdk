@@ -1,4 +1,5 @@
 import type { AuthMethod } from '../engine.js'
+import { SDK_VERSION } from "../../version.js"
 
 // SPIFFE JWT-SVID verification. The gateway validates against the site's
 // configured SPIFFE Bundle (JWKS with `use: "jwt-svid"`) and returns the
@@ -18,7 +19,7 @@ export const spiffe = (): AuthMethod => ({
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'spiffe',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      detectionVersion: '2026.04',
+      detectionVersion: SDK_VERSION,
       signals: {
         spiffe: true,
         spiffeId: verified?.subject ?? null,

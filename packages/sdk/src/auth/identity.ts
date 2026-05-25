@@ -5,6 +5,7 @@ import {
   type AgentIdentity,
   type IdentityClaim as IdentityClaimType,
 } from '@agentronics/protocol'
+import { SDK_VERSION } from '../version.js'
 
 export interface PresentIdentityOptions extends IdentityClaimType {
   /**
@@ -25,7 +26,7 @@ const buildIdentity = (claim: IdentityClaimType): AgentIdentity => ({
   confidence: 1,
   vendor: claim.vendor,
   userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-  detectionVersion: '2026.04',
+  detectionVersion: SDK_VERSION,
   signals: {
     declared: true,
     hasToken: true,

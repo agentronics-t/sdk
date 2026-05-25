@@ -1,4 +1,5 @@
 import type { AuthMethod } from '../engine.js'
+import { SDK_VERSION } from "../../version.js"
 
 export const extensionToken = (): AuthMethod => ({
   name: 'extensionToken',
@@ -11,7 +12,7 @@ export const extensionToken = (): AuthMethod => ({
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'browser-extension',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      detectionVersion: '2026.04',
+      detectionVersion: SDK_VERSION,
       signals: { extensionToken: true, verifiedRemotely: Boolean(verified) },
     }
   },

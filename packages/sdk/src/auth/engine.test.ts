@@ -9,7 +9,7 @@ const detected = (overrides: Partial<AgentIdentity> = {}): AgentIdentity => ({
   confidence: 0.7,
   vendor: null,
   userAgent: null,
-  detectionVersion: '2026.04',
+  detectionVersion: '0.1.2',
   signals: { webdriver: true },
   ...overrides,
 })

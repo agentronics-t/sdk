@@ -9,7 +9,7 @@ const identity = (overrides: Partial<AgentIdentity> = {}): AgentIdentity => ({
   confidence: 1,
   vendor: 'test',
   userAgent: null,
-  detectionVersion: '2026.04',
+  detectionVersion: '0.1.2',
   signals: {},
   ...overrides,
 })

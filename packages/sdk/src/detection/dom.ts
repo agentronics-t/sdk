@@ -1,4 +1,5 @@
 import type { AgentIdentity } from '@agentronics/protocol'
+import { SDK_VERSION } from "../version.js"
 
 interface SignalResult {
   hit: boolean
@@ -95,7 +96,7 @@ export const detectDom = (options: DetectDomOptions = {}): AgentIdentity | null 
     confidence,
     vendor: null,
     userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-    detectionVersion: '2026.04',
+    detectionVersion: SDK_VERSION,
     signals,
   }
 }

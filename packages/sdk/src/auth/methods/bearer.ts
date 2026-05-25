@@ -1,4 +1,5 @@
 import type { AuthMethod } from '../engine.js'
+import { SDK_VERSION } from "../../version.js"
 
 export const bearer = (): AuthMethod => ({
   name: 'bearer',
@@ -11,7 +12,7 @@ export const bearer = (): AuthMethod => ({
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'bearer',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      detectionVersion: '2026.04',
+      detectionVersion: SDK_VERSION,
       signals: { bearer: true, verifiedRemotely: Boolean(verified) },
     }
   },

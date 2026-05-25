@@ -4,6 +4,7 @@ import {
   type IdentityClaim as IdentityClaimRecord,
 } from '@agentronics/protocol'
 import type { AuthMethod } from '../engine.js'
+import { SDK_VERSION } from '../../version.js'
 
 const identityFromClaim = (claim: IdentityClaimRecord): AgentIdentity => ({
   class: claim.class,
@@ -11,7 +12,7 @@ const identityFromClaim = (claim: IdentityClaimRecord): AgentIdentity => ({
   confidence: 1,
   vendor: claim.vendor,
   userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-  detectionVersion: '2026.04',
+  detectionVersion: SDK_VERSION,
   signals: {
     declared: true,
     hasToken: true,

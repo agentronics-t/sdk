@@ -1,4 +1,5 @@
 import type { AuthMethod } from '../engine.js'
+import { SDK_VERSION } from "../../version.js"
 
 // Workforce SSO via OIDC ID tokens. Browser/Node SDKs forward the ID
 // token to the gateway's POST /v1/verify/sso route, which validates the
@@ -15,7 +16,7 @@ export const sso = (): AuthMethod => ({
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'sso',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      detectionVersion: '2026.04',
+      detectionVersion: SDK_VERSION,
       signals: {
         sso: true,
         subject: verified?.subject ?? null,

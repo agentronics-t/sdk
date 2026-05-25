@@ -1,4 +1,5 @@
 import type { AgentIdentity } from '@agentronics/protocol'
+import { SDK_VERSION } from "../version.js"
 
 interface ModelContextLike {
   client?: string
@@ -40,7 +41,7 @@ const buildIdentity = (ctx: ModelContextLike): AgentIdentity => ({
   confidence: 1,
   vendor: ctx.vendor ?? ctx.client ?? null,
   userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,
-  detectionVersion: '2026.04',
+  detectionVersion: SDK_VERSION,
   signals: {
     webmcp: true,
     toolCount: Array.isArray(ctx.tools) ? ctx.tools.length : 0,
