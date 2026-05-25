@@ -1,3 +1,4 @@
+import { auditId } from '../util/ids.js'
 import { Hono } from 'hono'
 import { SiteMemory } from '@agentronics/protocol'
 import { z } from 'zod'
@@ -68,7 +69,7 @@ export const createMemoryRoutes = ({
         updatedAt: new Date().toISOString(),
       })
       await storage.audit.insert({
-        id: `aud_${Math.random().toString(36).slice(2, 12)}`,
+        id: auditId(),
         orgId: auth.orgId,
         actor: auth.apiKeyId,
         action: 'memory.put',

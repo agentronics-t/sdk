@@ -44,6 +44,11 @@ export const verifyOidcIdToken = async (
   const { payload } = await jwtVerify(token, jwks, {
     issuer: config.issuer,
     audience: config.audiences,
+    // Explicit tolerance for IdP / client clock drift. 120s is the de
+    // facto enterprise default; tighter than the AWS / Okta / Azure
+    // 300s convention but loose enough that a well-configured fleet
+    // won't false-reject legitimate tokens during a clock-skew event.
+    clockTolerance: 120,
   })
   const vendor = (() => {
     try {
