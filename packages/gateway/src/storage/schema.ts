@@ -42,6 +42,13 @@ export const memory = pgTable('memory', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const tools = pgTable('tools', {
+  siteId: text('site_id').primaryKey(),
+  document: jsonb('document').notNull(),
+  etag: text('etag').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const traces = pgTable('traces', {
   id: text('id').primaryKey(),
   orgId: text('org_id').notNull(),

@@ -9,6 +9,7 @@ import { createRateLimit } from './middleware/rateLimit.js'
 import type { ClerkAuthOptions } from './middleware/clerkAuth.js'
 import { createPolicyRoutes } from './routes/policies.js'
 import { createMemoryRoutes } from './routes/memory.js'
+import { createToolRoutes } from './routes/tools.js'
 import { createSignatureRoutes } from './routes/signatures.js'
 import { createTraceRoutes } from './routes/traces.js'
 import { createApiKeyRoutes } from './routes/apiKeys.js'
@@ -105,6 +106,7 @@ export const createApp = ({
 
   app.route('/', createPolicyRoutes({ storage, resolveSession }))
   app.route('/', createMemoryRoutes({ storage, resolveSession }))
+  app.route('/', createToolRoutes({ storage, resolveSession }))
   app.route('/', createSignatureRoutes({ storage }))
   app.route('/', createTraceRoutes({ storage, resolveSession }))
   app.route('/', createMetricsRoutes({ storage, resolveSession }))

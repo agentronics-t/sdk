@@ -1,4 +1,4 @@
-import type { AgentClass, PolicyRule, SiteMemory, TraceEvent } from '@agentronics/protocol'
+import type { AgentClass, PolicyRule, SiteMemory, ToolDescriptor, TraceEvent } from '@agentronics/protocol'
 
 export interface OrgRecord {
   id: string
@@ -34,6 +34,12 @@ export interface PolicyDocument {
 
 export interface MemoryDocument {
   memory: SiteMemory
+  etag: string
+  updatedAt: string
+}
+
+export interface ToolsDocument {
+  tools: ToolDescriptor[]
   etag: string
   updatedAt: string
 }
@@ -164,6 +170,11 @@ export interface MemoryRepository {
   put(siteId: string, document: MemoryDocument): Promise<void>
 }
 
+export interface ToolsRepository {
+  get(siteId: string): Promise<ToolsDocument | null>
+  put(siteId: string, document: ToolsDocument): Promise<void>
+}
+
 export interface TraceQueryOptions {
   limit?: number
   cursor?: string | null
@@ -236,6 +247,7 @@ export interface Storage {
   apiKeys: ApiKeyRepository
   policies: PolicyRepository
   memory: MemoryRepository
+  tools: ToolsRepository
   traces: TraceRepository
   signatures: SignatureRepository
   audit: AuditRepository

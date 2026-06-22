@@ -4,6 +4,7 @@ import type {
   AuditEntry,
   DetectorSignatureDocument,
   MemoryDocument,
+  ToolsDocument,
   OrgRecord,
   PolicyDocument,
   QuotaCounter,
@@ -40,6 +41,7 @@ export const createInMemoryStorage = (seed: InMemoryStorageSeed = {}): Storage =
   const apiKeys = new Map<string, ApiKeyRecord>()
   const policies = new Map<string, PolicyDocument>()
   const memory = new Map<string, MemoryDocument>()
+  const tools = new Map<string, ToolsDocument>()
   const traces: Array<{ orgId: string; event: TraceEvent }> = []
   const audit: AuditEntry[] = []
   const webhooks: WebhookDelivery[] = []
@@ -135,6 +137,14 @@ export const createInMemoryStorage = (seed: InMemoryStorageSeed = {}): Storage =
         memory.set(siteId, document)
       },
     },
+    tools: {
+      async get(siteId) {
+        return tools.get(siteId) ?? null
+      },
+      async put(siteId, document) {
+        tools.set(siteId, document)
+      },
+    },
     traces: {
       async insert(orgId, events) {
         for (const event of events) traces.push({ orgId, event })
@@ -224,6 +234,8 @@ export const createInMemoryStorage = (seed: InMemoryStorageSeed = {}): Storage =
     },
     aggregates: {
       async insert(rows) {
+        // Replace, don't add: the compactor recomputes full bucket counts on
+        // every run, so summing here would double-count overlapping scans.
         for (const row of rows) {
           const existing = aggregates.find(
             (entry) =>
@@ -233,7 +245,7 @@ export const createInMemoryStorage = (seed: InMemoryStorageSeed = {}): Storage =
               entry.type === row.type &&
               entry.outcome === row.outcome
           )
-          if (existing) existing.count += row.count
+          if (existing) existing.count = row.count
           else aggregates.push({ ...row })
         }
       },
