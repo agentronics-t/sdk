@@ -35,7 +35,10 @@ describe('toToolDescriptor', () => {
 
 describe('createToolSync.push', () => {
   it('PUTs the registry to the site tools endpoint with the publishable key', async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify({ ok: true, count: 1 }), { status: 200 }))
+    const fetcher = vi.fn(
+      async (_url: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ ok: true, count: 1 }), { status: 200 })
+    )
     const sync = createToolSync({
       gatewayUrl: 'https://gw.example.com/',
       siteId: 'shop acme',
@@ -53,7 +56,9 @@ describe('createToolSync.push', () => {
   })
 
   it('throws on non-2xx', async () => {
-    const fetcher = vi.fn(async () => new Response('nope', { status: 403 }))
+    const fetcher = vi.fn(
+      async (_url: RequestInfo | URL, _init?: RequestInit) => new Response('nope', { status: 403 })
+    )
     const sync = createToolSync({
       gatewayUrl: 'https://gw.example.com',
       siteId: 's',
