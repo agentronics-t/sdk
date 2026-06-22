@@ -38,14 +38,13 @@ describe('compactTraces', () => {
     const fixture = await buildFixture()
     await fixture.storage.traces.insert(fixture.orgA.id, [
       event({ id: 'a', occurredAt: '2026-05-01T01:10:00.000Z' }),
+      event({ id: 'b', occurredAt: '2026-05-01T01:40:00.000Z' }),
     ])
     await compactTraces({ storage: fixture.storage, hoursBack: 24 * 365 })
     await compactTraces({ storage: fixture.storage, hoursBack: 24 * 365 })
     const rows = await fixture.storage.aggregates.query(fixture.orgA.id)
-    // The current adapter merges by (org, site, hour, type, outcome). Two
-    // identical scans produce 2 inserts of the same key, which deduplicates
-    // *aggregating count by 1 each time*. Document the current behavior so we
-    // know the production adapter must do upsert + sum (not delete + insert).
+    // The compactor recomputes full bucket counts and adapters replace the
+    // stored value, so overlapping scans converge on the true count.
     const total = rows.reduce((sum, row) => sum + row.count, 0)
     expect(total).toBe(2)
   })
