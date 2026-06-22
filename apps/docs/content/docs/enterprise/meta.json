@@ -1,4 +1,6 @@
 {
   "title": "Enterprise",
-  "pages": ["deployment-options", "data-export"]
+  "pages": [
+    "data-export"
+  ]
 }
