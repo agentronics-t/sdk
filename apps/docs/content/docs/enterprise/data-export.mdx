@@ -1,11 +1,11 @@
 ---
 title: Data export
-description: How audit logs and traces leave the gateway — JSON/CSV today, S3/GCS/Azure on the roadmap.
+description: How audit logs and traces leave the gateway — JSON/CSV and webhooks via the API.
 ---
 
 # Data export
 
-Three things customers ask for: a copy of their audit log, a copy of their raw traces, and a webhook stream to their own warehouse. v0.1 covers the first two via API; the third lands in 8b. Bulk delivery to S3/GCS/Azure is planned, not v0.1.
+Three things customers ask for: a copy of their audit log, a copy of their raw traces, and a webhook stream to their own warehouse. All three are available through the gateway API, covered below.
 
 ## Audit log
 
@@ -53,15 +53,10 @@ curl -X POST https://gateway.agentronics.dev/v1/webhooks/test \
 
 The cron-driven dispatcher drains the pending queue every minute. Failed deliveries retry up to 3 times with backoff before being dead-lettered. Dead-lettered deliveries stay queryable via `GET /v1/webhooks` so you can inspect what didn't make it.
 
-## Roadmap (post-v0.1)
+## Available channels
 
-| Channel | Status | Notes |
-|---|---|---|
-| `POST /v1/audit/export` (JSON / CSV) | ✅ v0.1 | This page. |
-| `GET /v1/traces` (paginated) | ✅ v0.1 | Cursor-based, 200 max per page. |
-| `POST /v1/webhooks/test` + cron drain | ✅ v0.1 | 3 retries → dead-letter. |
-| Bulk S3 delivery | 🚧 Planned | Per-org S3 bucket, gateway writes daily Parquet/JSON dumps. |
-| GCS / Azure | 🚧 Planned | Same shape as S3 once it ships. |
-| Snowflake / BigQuery direct share | 🤔 Considering | Driven by demand. |
-
-If you need bulk delivery sooner than the roadmap promises, talk to Support — single-tenant deployments can wire it now.
+| Channel | Notes |
+|---|---|
+| `POST /v1/audit/export` (JSON / CSV) | Per-org audit rows; stable columns. |
+| `GET /v1/traces` (paginated) | Cursor-based, 200 max per page. |
+| `POST /v1/webhooks/test` + cron drain | 3 retries → dead-letter, queryable via `GET /v1/webhooks`. |

@@ -1,4 +1,10 @@
 {
   "title": "Concepts",
-  "pages": ["three-agent-classes", "observability", "trust-levels", "policies", "site-memory", "tool-management"]
+  "pages": [
+    "three-agent-classes",
+    "trust-levels",
+    "policies",
+    "site-memory",
+    "tool-management"
+  ]
 }
