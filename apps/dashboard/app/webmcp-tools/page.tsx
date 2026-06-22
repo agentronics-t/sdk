@@ -1,3 +1,4 @@
+import type { ToolDescriptor } from '@agentronics/protocol'
 import { requireSession } from '../../lib/auth'
 import { gatewayJson } from '../../lib/gateway'
 import {
@@ -64,6 +65,22 @@ export default async function WebMcpToolsPage(props: {
   const totalTools = pages.reduce((sum, p) => sum + p.toolCount, 0)
   const totalExecutions = pages.reduce((sum, p) => sum + p.executions, 0)
   const hasUnknown = pages.some((p) => p.page === UNKNOWN_PAGE)
+
+  // Live registry (pushed by the SDK via client.syncTools) — schemas + token
+  // costs the trace stream can't provide. Per-site only.
+  const CONTEXT_BUDGET = 4000
+  const registry = selectedSite
+    ? await gatewayJson<{ tools: ToolDescriptor[] }>(
+        `/v1/sites/${encodeURIComponent(selectedSite)}/tools`
+      )
+        .then((r) => r.tools)
+        .catch(() => [] as ToolDescriptor[])
+    : []
+  const registryByPage = new Map<string, ToolDescriptor[]>()
+  for (const t of registry) {
+    const key = t.page || 'unattributed'
+    registryByPage.set(key, [...(registryByPage.get(key) ?? []), t])
+  }
 
   return (
     <section style={{ display: 'grid', gap: 16 }}>
@@ -141,6 +158,111 @@ export default async function WebMcpToolsPage(props: {
         <StatTile label="WebMCP tools" value={totalTools} />
         <StatTile label="Tool executions" value={totalExecutions} />
       </div>
+
+      {selectedSite && registry.length > 0 && (
+        <div style={{ display: 'grid', gap: 16 }}>
+          <h2 style={{ margin: '4px 0 0', fontSize: 16 }}>Registered tools by page</h2>
+          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 13 }}>
+            From the live registry the SDK syncs — input/output schemas, per-tool token
+            cost, and how full an agent&apos;s context gets if a page&apos;s tools all load.
+          </p>
+          {[...registryByPage.entries()]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([page, tools]) => {
+              const pageTokens = tools.reduce((s, t) => s + t.tokens, 0)
+              const pct = Math.min(100, Math.round((pageTokens / CONTEXT_BUDGET) * 100))
+              return (
+                <Card
+                  key={page}
+                  title={page}
+                  action={
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {tools.length} tool{tools.length === 1 ? '' : 's'} ·{' '}
+                      {pageTokens.toLocaleString()} tok
+                    </span>
+                  }
+                >
+                  <div style={{ marginBottom: 12 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: 12,
+                        color: 'var(--text-muted)',
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span>Context fullness if this page&apos;s tools load</span>
+                      <span>
+                        {pageTokens.toLocaleString()} / {CONTEXT_BUDGET.toLocaleString()} tokens ({pct}%)
+                      </span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 999, background: 'var(--bg-muted)', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${pct}%`,
+                          height: '100%',
+                          background: pct >= 80 ? 'var(--danger)' : pct >= 50 ? 'var(--accent)' : 'var(--success)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {tools.map((t) => (
+                      <details key={t.name} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px' }}>
+                        <summary style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer', fontSize: 13 }}>
+                          <code style={{ fontWeight: 600 }}>{t.name}</code>
+                          {t.group ? <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.group}</span> : null}
+                          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{t.tokens} tok</span>
+                        </summary>
+                        {t.description ? (
+                          <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '8px 0' }}>{t.description}</p>
+                        ) : null}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          {(['inputSchema', 'outputSchema'] as const).map((field) => (
+                            <div key={field}>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '.05em',
+                                  color: 'var(--text-faint)',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                {field === 'inputSchema' ? 'input schema' : 'output schema'}
+                              </div>
+                              <pre
+                                style={{
+                                  margin: 0,
+                                  fontSize: 11,
+                                  fontFamily: 'var(--font-mono)',
+                                  background: 'var(--bg-muted)',
+                                  borderRadius: 6,
+                                  padding: 8,
+                                  overflowX: 'auto',
+                                }}
+                              >
+                                {t[field] ? JSON.stringify(t[field], null, 2) : '—'}
+                              </pre>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                </Card>
+              )
+            })}
+        </div>
+      )}
+
+      {selectedSite && registry.length === 0 ? (
+        <p style={{ color: 'var(--text-faint)', fontSize: 12, margin: 0 }}>
+          No tool registry synced for this site yet. Call <code>client.syncTools()</code> from
+          the SDK after registering tools to populate the page-wise view above.
+        </p>
+      ) : null}
 
       {pages.length === 0 ? (
         <Card title="No tools observed">

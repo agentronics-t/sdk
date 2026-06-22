@@ -18,11 +18,15 @@ client.registerTool({
   stage: 'browse',
   description: 'Add an item to the cart.',
   inputSchema: { type: 'object', properties: { itemId: { type: 'string' } } },
+  outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } },
   authz: { minTrust: 'declared', allowedClasses: [], decision: 'allow' },
   rateLimit: { max: 3, windowSeconds: 60 },
   execute: async (input, { identity }) => addItem(input, identity),
 })
 ```
+
+`outputSchema` is optional and, like `inputSchema`, is surfaced in the dashboard
+(see below).
 
 `authz` is forwarded into the policy engine automatically — every governed tool produces a matching `tool:<name>` policy rule.
 
@@ -110,3 +114,21 @@ If a tool inflates `description` or `inputSchema` beyond reason, it lights up in
 | `tool.progressed` | A stage transition fires. |
 
 Filter for `tool.*` in the dashboard to watch the surfacing layer in real time.
+
+## Syncing to the dashboard
+
+`client.syncTools()` pushes the full registry — each tool's `page` (stage),
+`group`, input/output schema, and estimated token cost — to the gateway so the
+**Tool management** page can render it:
+
+```ts
+// after registering your tools
+await client.syncTools()
+```
+
+The dashboard groups the synced tools **page-wise** and, per page, shows each
+tool's input/output schema and token cost plus a **context-fullness** bar — how
+much of an agent's context window the page's tools occupy if they all load.
+That's the same `tokens` estimate `estimateTokens()` uses, so a fat description
+shows up as an outlier you can trim. Re-call `syncTools()` whenever your
+registry changes; it's a cheap idempotent upsert.
