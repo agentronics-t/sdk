@@ -7,6 +7,7 @@ export interface GovernedTool<Input = unknown, Output = unknown> {
   group?: string
   description?: string
   inputSchema?: Record<string, unknown>
+  outputSchema?: Record<string, unknown>
   stage?: string
   authz?: Omit<PolicyRule, 'id' | 'tool'>
   rateLimit?: PolicyRule['rateLimit']

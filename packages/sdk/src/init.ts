@@ -32,6 +32,7 @@ import {
   fetchWellKnownContext,
 } from './memory/delivery/index.js'
 import { createToolRegistry, type GovernedTool, type ToolRegistry } from './tools/registry.js'
+import { createToolSync } from './tools/toolSync.js'
 import {
   createProgressionStore,
   type ProgressionConfig,
@@ -140,6 +141,9 @@ export interface AgentronicsClient {
   fetchWellKnown(origin?: string): Promise<SiteMemory | null>
   installDomEnforcer(): { uninstall: () => void }
   registerTool(tool: GovernedTool): () => void
+  /** Push the full tool registry to the gateway so the dashboard can render
+   *  the page-wise view (schemas, per-tool tokens, context fullness). */
+  syncTools(): Promise<number>
   surfaceTools(options?: { identity?: AgentIdentity | null }): GovernedTool[]
   explainSurfacing(options?: { identity?: AgentIdentity | null }): SurfacingDecision[]
   groupedTools(options?: { identity?: AgentIdentity | null }): ToolGroupSummary[]
@@ -255,6 +259,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
   if (options.siteMemory !== undefined) siteMemoryOptions.initial = options.siteMemory
   const siteMemory = createSiteMemoryStore(siteMemoryOptions)
   const memoryCache = createMemoryCache({ gatewayUrl, siteId, publishableKey })
+  const toolSync = createToolSync({ gatewayUrl, siteId, publishableKey })
 
   const detect = async (detectOptions?: DetectAgentOptions) => {
     const start = Date.now()
@@ -472,6 +477,12 @@ export const init = (options: InitOptions): AgentronicsClient => {
         getIdentity: () => detect({ webmcp: { pollMs: 0 } }),
       }),
     registerTool: (tool: GovernedTool) => tools.register(tool),
+    syncTools: async () => {
+      const all = tools.list({ includeDisabled: true })
+      const count = await toolSync.push(all)
+      emitTrace({ type: 'tool.registered', metadata: { operation: 'sync', count } })
+      return count
+    },
     surfaceTools: ({ identity = null }: { identity?: AgentIdentity | null } = {}) => surfaceFor(identity),
     explainSurfacing: ({ identity = null }: { identity?: AgentIdentity | null } = {}) =>
       explainSurfacing(tools.list(), surfacingContext(identity)),
