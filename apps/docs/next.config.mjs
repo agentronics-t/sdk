@@ -13,6 +13,12 @@ const withMDX = createMDX()
 const config = {
   reactStrictMode: true,
   outputFileTracingRoot: tracingRoot,
+  // Multi-zone: the marketing site (landing-page) owns agentronics.dev and
+  // proxies /docs and /docs/* here. Prefix our static assets so they don't
+  // collide with the parent zone's /_next, and so a single set of parent
+  // rewrites (/docs, /docs/:path+, /docs-static/:path+) can route everything.
+  // Next 15 serves these assets under /docs-static/_next automatically.
+  assetPrefix: '/docs-static',
 }
 
 export default withMDX(config)
