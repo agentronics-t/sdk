@@ -14,7 +14,11 @@ const spaceMono = Space_Mono({
 export const metadata = {
   title: 'Agentronics Docs',
   description: 'Universal governance layer for agent-surfable websites.',
-  icons: { icon: '/logo.jpeg', shortcut: '/logo.jpeg', apple: '/logo.jpeg' },
+  icons: {
+    icon: '/docs-static/logo.jpeg',
+    shortcut: '/docs-static/logo.jpeg',
+    apple: '/docs-static/logo.jpeg',
+  },
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -5,7 +5,7 @@ import { source } from '../../lib/source'
 /** Logomark + sentence-case wordmark + a small DOCS pill — design brief 03 §4. */
 const NavTitle = () => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-    <img src="/favicon.svg" alt="" width={22} height={22} style={{ borderRadius: 5 }} />
+    <img src="/docs-static/favicon.svg" alt="" width={22} height={22} style={{ borderRadius: 5 }} />
     <span style={{ fontWeight: 700 }}>Agentronics</span>
     <span
       style={{
