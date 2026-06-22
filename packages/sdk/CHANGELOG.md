@@ -1,5 +1,22 @@
 # @agentronics/sdk
 
+## 0.2.0
+
+### Minor Changes
+
+- 98aedb9: Tool registry sync + site-memory dashboard support.
+
+  - `@agentronics/protocol`: add `ToolDescriptor` / `ToolRegistry` wire schemas.
+  - `@agentronics/sdk`: `client.syncTools()` pushes the registered tools (page,
+    group, input/output schema, per-tool token estimate) to the gateway so the
+    dashboard can render the page-wise Tool management view; `registerTool` now
+    accepts an optional `outputSchema`.
+
+### Patch Changes
+
+- Updated dependencies [98aedb9]
+  - @agentronics/protocol@0.2.0
+
 ## 0.1.2
 
 ### Patch Changes
