@@ -1,14 +1,24 @@
 import type { ReactNode } from 'react'
 import { RootProvider } from 'fumadocs-ui/provider'
-import { Space_Mono } from 'next/font/google'
+import { DM_Sans, JetBrains_Mono } from 'next/font/google'
 import 'fumadocs-ui/style.css'
 import './theme.css'
 
-const spaceMono = Space_Mono({
-  weight: ['400', '700'],
+// Brand typography (matches the marketing site + dashboard): DM Sans for UI/body,
+// JetBrains Mono for code. Exposed as --font-sans / --font-mono, consumed by
+// theme.css and @agentronics/theme tokens.
+const dmSans = DM_Sans({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-sans',
   display: 'swap',
-  variable: '--font-space-mono',
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-mono',
+  display: 'swap',
 })
 
 export const metadata = {
@@ -23,11 +33,16 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`dark ${spaceMono.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${dmSans.variable} ${jetbrainsMono.variable}`}
+    >
       <body>
-        {/* Dark-only by decision (see @agentronics/theme tokens + theme.css):
-            force the dark theme and never let next-themes resolve to light. */}
-        <RootProvider theme={{ defaultTheme: 'dark', enableSystem: false }}>
+        {/* Light by default with a working theme switcher, matching the brand
+            palette (@agentronics/theme tokens + theme.css). next-themes manages
+            the `.dark` class; Fumadocs' RootProvider handles the no-flash script. */}
+        <RootProvider theme={{ defaultTheme: 'light', enableSystem: true }}>
           {children}
         </RootProvider>
       </body>
