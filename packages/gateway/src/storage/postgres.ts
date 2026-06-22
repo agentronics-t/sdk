@@ -240,6 +240,41 @@ export const createPostgresStorage = (databaseUrl: string): Storage => {
           })
       },
     },
+    tools: {
+      async get(siteId) {
+        const rows = await db
+          .select()
+          .from(schema.tools)
+          .where(eq(schema.tools.siteId, siteId))
+          .limit(1)
+        const r = rows[0]
+        if (!r) return null
+        const doc = r.document as { tools: unknown }
+        return {
+          tools: (doc.tools ?? []) as never,
+          etag: r.etag,
+          updatedAt: r.updatedAt.toISOString(),
+        }
+      },
+      async put(siteId, document) {
+        await db
+          .insert(schema.tools)
+          .values({
+            siteId,
+            document: { tools: document.tools },
+            etag: document.etag,
+            updatedAt: new Date(document.updatedAt),
+          })
+          .onConflictDoUpdate({
+            target: schema.tools.siteId,
+            set: {
+              document: { tools: document.tools },
+              etag: document.etag,
+              updatedAt: new Date(document.updatedAt),
+            },
+          })
+      },
+    },
 
     traces: {
       async insert(orgId, events) {
@@ -434,6 +469,10 @@ export const createPostgresStorage = (databaseUrl: string): Storage => {
         // SELECT-then-UPDATE merge instead of an UPSERT. Acceptable for
         // a low-frequency cron-aggregation step; revisit if the rollup
         // job moves into the request path.
+        //
+        // Replace, don't add: the compactor recomputes full bucket counts
+        // on every run, so summing here would double-count overlapping
+        // scan windows.
         for (const row of rows) {
           const conditions = and(
             eq(schema.traceAggregates.orgId, row.orgId),
@@ -450,7 +489,7 @@ export const createPostgresStorage = (databaseUrl: string): Storage => {
           if (existing[0]) {
             await db
               .update(schema.traceAggregates)
-              .set({ count: sql`${schema.traceAggregates.count} + ${row.count}` })
+              .set({ count: row.count })
               .where(conditions)
           } else {
             await db.insert(schema.traceAggregates).values({
