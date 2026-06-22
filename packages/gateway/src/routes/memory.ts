@@ -25,7 +25,7 @@ export const createMemoryRoutes = ({
 
   app.get(
     '/v1/sites/:siteId/memory',
-    apiKeyAuth({ storage, scopes: ['publishable', 'secret'] }),
+    eitherAuth(apiKeyAuth({ storage, scopes: ['publishable', 'secret'] }), clerkAuth({ resolveSession })),
     async (c) => {
       const siteId = c.req.param('siteId')
       const auth = c.get('auth')
