@@ -25,9 +25,9 @@ export const metadata = {
   title: 'Agentronics Docs',
   description: 'Universal governance layer for agent-surfable websites.',
   icons: {
-    icon: '/docs-static/logo.jpeg',
-    shortcut: '/docs-static/logo.jpeg',
-    apple: '/docs-static/logo.jpeg',
+    icon: '/docs-static/icon.svg',
+    shortcut: '/docs-static/icon.svg',
+    apple: '/docs-static/icon.svg',
   },
 }
 
