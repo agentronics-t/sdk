@@ -2,7 +2,7 @@ import { AgentClass, type AgentIdentity, type TrustLevel } from '@agentronics/pr
 import { SDK_VERSION } from "../version.js"
 
 export interface DeclareAgentInput {
-  class: 'webmcp' | 'dom' | 'screenshot'
+  class: 'webmcp' | 'dom' | 'screenshot' | 'crawler'
   vendor: string
   /** Optional bearer token returned by the customer's verification endpoint. */
   verificationToken?: string
