@@ -1,13 +1,13 @@
 ---
 title: Tool management
-description: Surfacing strategy, groups, progression stages, trust-based filtering, and a token budget worked example.
+description: Surface the right tools to the right agents — and see every tool's schema, token cost, and page-wise context budget.
 ---
 
 # Tool management
 
-You probably have far more tools than any agent should see at once. Tool management is the layer that decides — given the current agent's trust, class, and where they are in your flow — which subset to expose.
+You probably have far more tools than any agent should see at once. Tool management is the layer that decides — given the current agent's trust, class, and where they are in your flow — which subset to expose, and the dashboard that shows you what every tool costs an agent's context.
 
-The point: agents stop thrashing through 60-tool menus. You ship one registry, the SDK decides what to surface.
+The point: agents stop thrashing through 60-tool menus. You ship one registry, the SDK decides what to surface, and the product UI shows you the bill.
 
 ## Register tools
 
@@ -25,10 +25,7 @@ client.registerTool({
 })
 ```
 
-`outputSchema` is optional and, like `inputSchema`, is surfaced in the dashboard
-(see below).
-
-`authz` is forwarded into the policy engine automatically — every governed tool produces a matching `tool:<name>` policy rule.
+`outputSchema` is optional and, like `inputSchema`, is surfaced in the dashboard (see below). `authz` is forwarded into the policy engine automatically — every governed tool produces a matching `tool:<name>` policy rule.
 
 ## Surfacing
 
@@ -98,11 +95,43 @@ Tool descriptions cost tokens — every surfaced tool occupies space in the agen
 
 The estimate is `Math.ceil(JSON.stringify(descriptor).length / 4)` — a rough OpenAI-style rule of thumb. Use it to reject overlarge tool sets before publishing.
 
+## Syncing to the dashboard
+
+`client.syncTools()` pushes the full registry — each tool's `page` (stage), `group`, input/output schema, and estimated token cost — to the gateway so the **Tool management** page can render it:
+
+```ts
+// after registering your tools
+await client.syncTools()
+```
+
+It's a cheap idempotent upsert — re-call it whenever your registry changes.
+
+## The Tool management view
+
+The dashboard groups the synced tools **page-wise** (by `page`/stage), and for each page shows every tool's input/output schema and token cost. Each tool renders like this:
+
+<SchemaBlock
+  name="cart.add"
+  tokens={42}
+  input={{ type: "object", properties: { itemId: { type: "string" } }, required: ["itemId"] }}
+  output={{ type: "object", properties: { ok: { type: "boolean" } } }}
+/>
+
+### Context fullness, per page
+
+The headline number on each page is **context fullness** — how much of an agent's context window the page's tools occupy *if they all load at once*. The dashboard budgets **4,000 tokens** per page; the bar fills as you add tools:
+
+<ContextFullnessBar label="Page: /browse — 4 tools" tokens={612} budget={4000} />
+
+<ContextFullnessBar label="Page: /checkout — 11 tools" tokens={3120} budget={4000} />
+
+It's the same `tokens` estimate `estimateTokens()` uses, so a fat description shows up as an outlier you can trim. As a page's tools approach the budget the bar shifts amber, then red past 100% — your cue to split the page, gate tools behind a later stage, or trim descriptions.
+
 ### Worked example
 
-A retail site has 14 tools. For a `detected`-trust visitor, surfacing returns the 4 read-only ones (catalog search, catalog read, reviews read, shipping estimate), totaling ≈160 tokens. After the user signs in (`linked`), the same registry surfaces 12 of 14, totaling ≈480 tokens — still well under any reasonable model budget.
+A retail site has 14 tools. For a `detected`-trust visitor on `/browse`, surfacing returns the 4 read-only ones (catalog search, catalog read, reviews read, shipping estimate) — ~612 tokens, comfortably under budget. After the user signs in (`linked`) and advances to `/checkout`, the same registry surfaces 11 of 14 — ~3,120 tokens, still under 4,000 but now in the amber zone, exactly where you'd want to start trimming.
 
-If a tool inflates `description` or `inputSchema` beyond reason, it lights up in `perTool` as an outlier. Trim the description, or split a fat tool into two.
+If a tool inflates `description` or `inputSchema` beyond reason, it lights up in `perTool` (and as a tall slice of the bar) as an outlier. Trim the description, or split a fat tool into two.
 
 ## Traces
 
@@ -114,21 +143,3 @@ If a tool inflates `description` or `inputSchema` beyond reason, it lights up in
 | `tool.progressed` | A stage transition fires. |
 
 Filter for `tool.*` in the dashboard to watch the surfacing layer in real time.
-
-## Syncing to the dashboard
-
-`client.syncTools()` pushes the full registry — each tool's `page` (stage),
-`group`, input/output schema, and estimated token cost — to the gateway so the
-**Tool management** page can render it:
-
-```ts
-// after registering your tools
-await client.syncTools()
-```
-
-The dashboard groups the synced tools **page-wise** and, per page, shows each
-tool's input/output schema and token cost plus a **context-fullness** bar — how
-much of an agent's context window the page's tools occupy if they all load.
-That's the same `tokens` estimate `estimateTokens()` uses, so a fat description
-shows up as an outlier you can trim. Re-call `syncTools()` whenever your
-registry changes; it's a cheap idempotent upsert.

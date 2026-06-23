@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page'
 import { source } from '../../../lib/source'
+import { getMDXComponents } from '../../../mdx-components'
 
 export default async function Page(props: { params: Promise<{ slug?: string[] }> }) {
   const params = await props.params
@@ -15,7 +16,7 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDX />
+        <MDX components={getMDXComponents()} />
       </DocsBody>
     </DocsPage>
   )

@@ -1,13 +1,30 @@
 ---
 title: Site memory
-description: Enterprise-provided context delivered to every agent class.
+description: Structured, JSON site context served to every agent class — and scored for how useful it is.
 ---
 
 # Site memory
 
-Site memory is the structured context your enterprise hands to agents — page map, workflows, business policies, UI guidance, per-page state. The point: agents stop screenshotting their way through your site.
+Site memory is the structured context your enterprise hands to agents — page map, workflows, business policies, UI guidance, per-page state. You author it once as **JSON**; the SDK serves it to agents over the channel each one understands. The point: agents stop screenshotting and guessing their way through your site.
 
-This is **not** the agent's own memory. Conversation history belongs to the agent. Site memory belongs to you.
+This is **not** the agent's own memory. Conversation history belongs to the agent. Site memory belongs to you — it's the machine-readable description of how your site works.
+
+> **Site memory is JSON, delivered as a WebMCP capability.** A WebMCP-native agent doesn't scrape your DOM — it calls a synthetic `getSiteContext` tool and receives this snapshot verbatim. The same JSON also powers the `<meta>`/JSON-LD tags, the screenshot overlay, and the `/.well-known/agent-context.json` endpoint, so every agent class reads the *same* source of truth.
+
+## The end-to-end flow
+
+```
+author (SDK or dashboard)
+        │  provideSiteMemory({...})  /  PUT /v1/sites/:id/memory
+        ▼
+   gateway store  ──(ETag)──►  client.syncSiteMemory()  ──►  browser snapshot
+        │                                                        │
+        │                                                        ├─ WebMCP synthetic tool  → WebMCP agents
+        ├─ /.well-known/agent-context.json → anything, no SDK    ├─ <meta> + JSON-LD       → DOM agents, search
+        └─ dashboard "Site memory" view + AI score               └─ visual overlay         → screenshot agents
+```
+
+You can author memory two ways — in code (`provideSiteMemory`) or in the dashboard — and they converge on the same gateway-stored snapshot. The browser SDK pulls it with `syncSiteMemory()` and fans it out to the four delivery channels.
 
 ## Provide it once
 
@@ -68,11 +85,28 @@ Different agent classes consume site memory differently. The SDK ships all four 
 | Channel | Best for | API |
 |---|---|---|
 | WebMCP synthetic tool | WebMCP-native agents | `createWebMcpContextTool({ getSnapshot })` |
-| `<meta>` + JSON-LD | DOM agents, search engines | `client.installMemoryDelivery({ metaTags: true })` |
+| `<meta>` + JSON-LD | DOM agents, search engines, crawlers | `client.installMemoryDelivery({ metaTags: true })` |
 | Visual overlay | Screenshot agents | `client.installMemoryDelivery({ overlay: true })` |
 | `/.well-known/agent-context.json` | Anything, no SDK | `serializeWellKnownContext({ snapshot })` on the host |
 
 The well-known endpoint is the universal fallback — like `robots.txt` for AI agents. Agentronics serves it through the gateway; production hosts proxy from their domain.
+
+### Site context as a WebMCP tool
+
+For WebMCP-native agents, the most direct channel is a synthetic tool. The agent sees a `getSiteContext` tool in its menu and calls it instead of inspecting the page:
+
+```ts
+import { createWebMcpContextTool } from '@agentronics/sdk'
+
+const contextTool = createWebMcpContextTool({
+  getSnapshot: () => client.siteMemory.get(),
+})
+
+// register alongside your other governed tools
+client.registerTool(contextTool)
+```
+
+The agent receives the JSON snapshot as the tool result — no DOM reads, no screenshots. Because it's a governed tool, the call is traced (`memory.accessed`), so you can see exactly which agents pull context and when.
 
 ## Gateway sync
 
@@ -86,17 +120,30 @@ The SDK keeps an ETag, so subsequent syncs are 304s with no payload.
 
 ## Dashboard view & quality score
 
-The **Site memory** page in the dashboard renders the exact snapshot each site
-hands to agents (the same JSON delivered over WebMCP and the well-known
-endpoint), so you can see what an agent sees. Alongside it, the snapshot is
-scored **0–100** for how useful it is to an agent — weighing completeness,
-clarity, and actionability — with concrete suggestions for what to add.
+The **Site memory** page in the dashboard renders the exact snapshot each site hands to agents (the same JSON delivered over WebMCP and the well-known endpoint), so you can see what an agent sees. Alongside it, the snapshot is **scored 0–100** for how useful it is to an agent:
 
-Scoring runs server-side in the dashboard via Vertex AI Gemini when configured,
-and falls back to a deterministic completeness check (does the snapshot have a
-site map, navigation, workflows, policies, UI guidance, and per-page context?)
-so a score always renders. The numbers the score reasons over come from the
-snapshot itself — nothing is invented.
+<ScoreGauge value={82} />
+
+The score weighs **completeness, clarity, and actionability**. Scoring runs server-side in the dashboard via Vertex AI Gemini when configured, and falls back to a deterministic completeness check so a number always renders. The completeness check asks whether the snapshot has each of these:
+
+<CompletenessList items={[
+  { label: "Site map — pages with paths + purpose", present: true },
+  { label: "Navigation — flow + pattern between pages", present: true },
+  { label: "Workflows — multi-step task definitions", present: true },
+  { label: "Policies — shipping, returns, business rules", present: true },
+  { label: "UI guidance — selectors + behavior per action", present: true },
+  { label: "Per-page context — live state for dynamic pages", present: false },
+]} />
+
+The numbers the score reasons over come from the snapshot itself — nothing is invented. A snapshot missing UI guidance and per-page context lands in the "Adequate" band with concrete suggestions for what to add; fill those in and it climbs toward "Strong."
+
+### Reading the bands
+
+| Band | Score | Meaning |
+|---|---|---|
+| **Strong** | 75–100 | An agent can navigate and transact without guessing. |
+| **Adequate** | 50–74 | Core structure present; missing depth (live state, UI selectors). |
+| **Thin** | 0–49 | Agents will fall back to screenshots/DOM scraping. Add a site map + workflows first. |
 
 ## Traces
 
