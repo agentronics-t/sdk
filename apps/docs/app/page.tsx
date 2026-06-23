@@ -14,7 +14,7 @@ export default function HomePage() {
   return (
     <main className="landing">
       <div className="landing-brand">
-        <img src="/docs-static/logo.jpeg" alt="" />
+        <img src="/docs-static/icon.svg" alt="" />
         <span>AGENTRONICS</span>
       </div>
       <header className="landing-hero">
