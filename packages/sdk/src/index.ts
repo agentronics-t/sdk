@@ -98,9 +98,11 @@ import {
   createConsoleExporter,
   createGatewayExporter,
   createWebhookExporter,
+  createIntelExporter,
   type TraceExporter,
   type TraceInput,
   type Tracer,
+  type IntelExporterOptions,
 } from './observability/index.js'
 
 export {
@@ -149,6 +151,7 @@ export {
   createConsoleExporter,
   createGatewayExporter,
   createWebhookExporter,
+  createIntelExporter,
 }
 export type {
   AgentronicsClient,
@@ -201,6 +204,7 @@ export type {
   TraceExporter,
   TraceInput,
   Tracer,
+  IntelExporterOptions,
 }
 
 export const Agentronics = { init, declareAgent, detectAgent }
