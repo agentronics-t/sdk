@@ -42,7 +42,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Light by default with a working theme switcher, matching the brand
             palette (@agentronics/theme tokens + theme.css). next-themes manages
             the `.dark` class; Fumadocs' RootProvider handles the no-flash script. */}
-        <RootProvider theme={{ defaultTheme: 'light', enableSystem: true }}>
+        {/* Search endpoint lives under /docs so the marketing-site multi-zone
+            rewrite proxies it (see app/docs/api/search/route.ts). */}
+        <RootProvider
+          theme={{ defaultTheme: 'light', enableSystem: true }}
+          search={{ options: { api: '/docs/api/search' } }}
+        >
           {children}
         </RootProvider>
       </body>
