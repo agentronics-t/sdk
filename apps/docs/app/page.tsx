@@ -2,7 +2,7 @@ import Link from 'next/link'
 import './landing.css'
 
 const PILLARS = [
-  { title: 'Detection', body: 'Identify WebMCP, DOM, and screenshot agents with a confidence-scored signal stack.', href: '/docs/detection' },
+  { title: 'Detection', body: 'Identify WebMCP, crawler, DOM, and screenshot agents with a confidence-scored signal stack.', href: '/docs/detection' },
   { title: 'Auth', body: 'Normalize OAuth, sessions, headers, and detection-as-auth into one trust level.', href: '/docs/auth' },
   { title: 'Authorization', body: 'Enterprise policies enforced in the browser, audited in the gateway.', href: '/docs/authorization' },
   { title: 'Site memory', body: 'Serve structured site context to agents instead of letting them screenshot.', href: '/docs/concepts/site-memory' },
@@ -22,7 +22,7 @@ export default function HomePage() {
         <h1>Universal governance for agent-surfable websites.</h1>
         <p className="landing-lede">
           One SDK line. Six pillars in v0.1 (payments lands later). Every agent type — WebMCP-native,
-          DOM-based, screenshot-based — detected, authenticated, authorized, and audited.
+          crawler, DOM-based, screenshot-based — detected, authenticated, authorized, and audited.
         </p>
         <div className="landing-actions">
           <Link href="/docs/getting-started" className="landing-cta landing-cta--primary">
