@@ -1,5 +1,13 @@
 # @agentronics/react
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [c46536b]
+  - @agentronics/protocol@0.3.0
+  - @agentronics/sdk@0.3.0
+
 ## 0.1.3
 
 ### Patch Changes
