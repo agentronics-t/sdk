@@ -10,10 +10,10 @@ const NavTitle = () => (
     <span
       style={{
         fontSize: 10,
-        fontFamily: 'var(--font-space-mono), monospace',
+        fontFamily: 'var(--font-mono), monospace',
         letterSpacing: '0.04em',
-        color: '#a4a8c5',
-        border: '1px solid #1f2547',
+        color: 'var(--content-muted)',
+        border: '1px solid var(--border)',
         borderRadius: 4,
         padding: '1px 5px',
       }}
@@ -25,11 +25,7 @@ const NavTitle = () => (
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <DocsLayout
-      tree={source.pageTree}
-      nav={{ title: <NavTitle /> }}
-      disableThemeSwitch
-    >
+    <DocsLayout tree={source.pageTree} nav={{ title: <NavTitle /> }}>
       {children}
     </DocsLayout>
   )

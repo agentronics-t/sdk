@@ -1,5 +1,6 @@
 import type { AgentIdentity } from '@agentronics/protocol'
 import { detectDom } from '../dom.js'
+import { detectCrawler } from '../crawler.js'
 import { detectWebMcp } from '../webmcp.js'
 
 export type DetectorStatus = 'stable' | 'beta' | 'research'
@@ -15,6 +16,11 @@ export const bundledDetectors = (): Detector[] => [
     id: 'webmcp.model-context',
     status: 'stable',
     detect: () => detectWebMcp({ pollMs: 0 }),
+  },
+  {
+    id: 'crawler.user-agent',
+    status: 'beta',
+    detect: () => detectCrawler(),
   },
   {
     id: 'dom.automation-heuristics',

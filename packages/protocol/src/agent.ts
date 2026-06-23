@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const AgentClass = z.enum(['webmcp', 'dom', 'screenshot'])
+export const AgentClass = z.enum(['webmcp', 'dom', 'screenshot', 'crawler'])
 export type AgentClass = z.infer<typeof AgentClass>
 
 export const TrustLevel = z.enum(['detected', 'declared', 'verified', 'linked'])

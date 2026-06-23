@@ -1,12 +1,15 @@
-@import '@agentronics/theme/fonts.css';
-@import '@agentronics/theme/tokens.css';
+/* Docs home (app/page.tsx) — brand palette. Role tokens (--canvas/--surface/
+   --content/--brand/--accent/--border/--radius-*) come from theme.css, which is
+   imported globally in layout.tsx, so this file just consumes them. Fonts are
+   loaded via next/font in layout.tsx (--font-sans = DM Sans, --font-mono = JetBrains
+   Mono). */
 
 .landing {
-  background: var(--bg);
-  color: var(--text);
+  background: var(--canvas);
+  color: var(--content);
   padding: 4rem 1.5rem 6rem;
   min-height: 100dvh;
-  font-family: var(--font-sans);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 .landing > * {
@@ -21,7 +24,7 @@
   margin-bottom: 2rem;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: var(--highlight);
+  color: var(--content);
 }
 
 .landing-brand img {
@@ -35,11 +38,11 @@
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--highlight);
-  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .landing-hero h1 {
@@ -54,7 +57,7 @@
 .landing-lede {
   font-size: 1rem;
   line-height: 1.7;
-  color: var(--text-muted);
+  color: var(--content-secondary);
   max-width: 64ch;
 }
 
@@ -69,43 +72,43 @@
   display: inline-flex;
   align-items: center;
   padding: 0.7rem 1.2rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
-  font-weight: 700;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--content);
+  font-weight: 600;
   text-decoration: none;
   font-family: inherit;
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
 .landing-cta:hover {
-  border-color: var(--accent);
+  border-color: var(--brand);
   transform: translateY(-1px);
 }
 
 .landing-cta--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-on);
+  background: var(--brand-solid);
+  border-color: var(--brand-solid);
+  color: #ffffff;
 }
 
 .landing-cta--primary:hover {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+  background: var(--brand);
+  border-color: var(--brand);
 }
 
 .landing-snippet {
   margin-top: 2.25rem;
-  background: var(--bg-elevated);
+  background: var(--code-bg);
+  color: var(--code-fg);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   padding: 1rem 1.25rem;
-  font-family: inherit;
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.92rem;
   line-height: 1.6;
   overflow-x: auto;
-  color: var(--text);
 }
 
 .landing-grid {
@@ -118,38 +121,39 @@
 .landing-card {
   position: relative;
   display: block;
-  background: var(--bg-elevated);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   padding: 1.25rem 1.4rem 1.5rem;
   text-decoration: none;
-  color: var(--text);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  color: var(--content);
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .landing-card:hover {
-  border-color: var(--accent);
+  border-color: var(--brand);
   transform: translateY(-2px);
+  box-shadow: 0 8px 24px -12px color-mix(in srgb, var(--brand) 60%, transparent);
 }
 
 .landing-card h2 {
   font-size: 1.05rem;
   margin: 0 0 0.5rem;
-  color: var(--accent-strong);
+  color: var(--brand);
 }
 
 .landing-card p {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.6;
-  color: var(--text-muted);
+  color: var(--content-secondary);
 }
 
 .landing-card-arrow {
   position: absolute;
   top: 1.25rem;
   right: 1.25rem;
-  color: var(--highlight);
+  color: var(--accent);
   font-size: 0.95rem;
 }
 
@@ -159,22 +163,22 @@
   gap: 1rem;
   margin-top: 4rem;
   padding: 1.5rem;
-  background: var(--bg-muted);
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
 }
 
 .landing-meta h3 {
   margin: 0 0 0.4rem;
   font-size: 1rem;
-  color: var(--highlight);
+  color: var(--brand);
 }
 
 .landing-meta p {
   margin: 0;
   font-size: 0.88rem;
   line-height: 1.55;
-  color: var(--text-muted);
+  color: var(--content-secondary);
 }
 
 .landing-footer {
@@ -184,14 +188,14 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--content-muted);
 }
 
 .landing-footer a {
-  color: var(--text-muted);
+  color: var(--content-muted);
   text-decoration: none;
 }
 
 .landing-footer a:hover {
-  color: var(--highlight);
+  color: var(--brand);
 }

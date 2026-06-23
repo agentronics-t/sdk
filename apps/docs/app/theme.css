@@ -1,57 +1,113 @@
-/* Override Fumadocs' default theme with the Agentronics palette + Space Mono.
- * Affects every /docs/* page; the marketing landing has its own scoped CSS.
+/* Agentronics docs theme — brand palette (light + dark) + Fumadocs v14 mapping.
  *
- * IMPORTANT: Fumadocs UI v14 reads `--fd-*` variables in **HSL channel**
- * format (`H S% L%`), consumed as `hsl(var(--fd-background) / 1)`. (The
- * `--color-fd-*` RGB names are the v15 / Tailwind-v4 convention and are NOT
- * read by v14 — overriding those leaves the stock light theme in place,
- * which is the bug this file previously had.)
+ * Canonical tokens mirror landing_page_UI/Colors/agentronics-palette.html and the
+ * marketing site: cool-slate neutrals, indigo #736ced primary, amber accent, with
+ * DM Sans + JetBrains Mono (loaded in layout.tsx as --font-sans / --font-mono).
  *
- * Dark-only by decision: the docs force the `.dark` class and hide the theme
- * switcher, so these values are the only theme that ships. `:root` is set to
- * the same palette purely as a pre-hydration safety net.
+ * The docs are intentionally self-contained: the shared @agentronics/theme package
+ * still ships the OLD dark-only Space Mono palette (consumed by demo/dashboard), so
+ * we define the brand role tokens here instead of importing it.
  *
- * Design brief 03 — "brand the framework, not reinvent it." */
-@import '@agentronics/theme/tokens.css';
+ * Fumadocs UI v14 reads `--fd-*` variables in **HSL channel** format (`H S% L%`),
+ * consumed as `hsl(var(--fd-background) / 1)`. We map the brand palette into `--fd-*`
+ * as HSL triplets for BOTH light (:root) and dark (.dark). The hex role tokens
+ * (--canvas/--surface/--content/--brand/...) are defined alongside for the docs home
+ * (landing.css) and the custom MDX widgets. */
 
-html,
-body {
-  font-family: var(--font-space-mono), var(--font-sans);
+:root {
+  /* Brand role tokens — LIGHT (hex) */
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --surface-raised: #f6f7f9;
+  --border: #e3e6ec;
+  --border-strong: #cbd0da;
+  --content: #0e1017;
+  --content-secondary: #515a6c;
+  --content-muted: #828a9b;
+  --brand: #736ced;       /* identity / accents / glow — not for white text */
+  --brand-solid: #5a4fd9; /* interactive fill w/ white text (AA 5.9:1) */
+  --brand-soft: #f0effe;  /* tinted container */
+  --accent: #ff9e1c;
+  --accent-content: #06070e;
+  --ring: #736ced;
+  --success: #18935a; --success-bg: #e7f6ee;
+  --warning: #d97706; --warning-bg: #fdf2e0;
+  --danger: #d92d3c; --danger-bg: #fdecec;
+  --info: #2081c3; --info-bg: #e6f2fb;
+  --code-bg: #0e1017; --code-fg: #e4e2fd;
+  /* Shape */
+  --radius-sm: 7px; --radius-md: 9px; --radius-lg: 12px; --radius-xl: 14px; --radius-pill: 999px;
+
+  /* Fumadocs v14 — LIGHT (HSL channels) */
+  --fd-background: 220 20% 97%;       /* canvas #f6f7f9 */
+  --fd-foreground: 224 24% 7%;        /* content #0e1017 */
+  --fd-card: 0 0% 100%;               /* surface #ffffff */
+  --fd-card-foreground: 224 24% 7%;
+  --fd-popover: 0 0% 100%;
+  --fd-popover-foreground: 224 24% 7%;
+  --fd-muted: 220 19% 94%;            /* neutral-100 #eceef2 */
+  --fd-muted-foreground: 221 11% 56%; /* content-muted #828a9b */
+  --fd-border: 220 19% 91%;           /* border #e3e6ec */
+  --fd-primary: 245 64% 58%;          /* brand-solid #5a4fd9 (white text) */
+  --fd-primary-foreground: 0 0% 100%;
+  --fd-secondary: 220 19% 94%;
+  --fd-secondary-foreground: 224 24% 7%;
+  --fd-accent: 244 88% 97%;           /* brand-soft #f0effe (hover surface) */
+  --fd-accent-foreground: 224 24% 7%;
+  --fd-ring: 243 78% 68%;             /* ring #736ced */
 }
 
-:root,
 .dark {
-  /* Surfaces — Agentronics dark navy. */
-  --fd-background: 234 58% 6%; /* #07091A */
-  --fd-foreground: 240 5% 96%; /* #F4F4F5 */
-  --fd-muted: 232 47% 13%; /* #11152F */
-  --fd-muted-foreground: 233 22% 71%; /* #A4A8C5 */
-  --fd-popover: 233 51% 10%; /* #0D1028 */
-  --fd-popover-foreground: 240 5% 96%;
-  --fd-card: 233 51% 10%; /* #0D1028 */
-  --fd-card-foreground: 240 5% 96%;
-  --fd-border: 231 39% 20%; /* #1F2547 */
+  /* Brand role tokens — DARK (hex) */
+  --canvas: #06070e;
+  --surface: #0e1017;
+  --surface-raised: #181c24;
+  --border: #262b35;
+  --border-strong: #3b4350;
+  --content: #f4f5f8;
+  --content-secondary: #b6bcca;
+  --content-muted: #8b93a4;
+  --brand: #8d85f2;       /* lifted so it glows on near-black */
+  --brand-solid: #5a4fd9;
+  --brand-soft: #1a1840;
+  --accent: #ffae33;
+  --accent-content: #06070e;
+  --ring: #8d85f2;
+  --success: #34d399; --success-bg: #0e2a1d;
+  --warning: #fbbf24; --warning-bg: #2e2106;
+  --danger: #f76e72; --danger-bg: #2c1315;
+  --info: #38bdf8; --info-bg: #0a2433;
+  --code-bg: #0a0b12; --code-fg: #cbc7fb;
 
-  /* Indigo primary — buttons, links, focus rings, active nav. */
-  --fd-primary: 239 84% 67%; /* #6366F1 */
-  --fd-primary-foreground: 234 58% 6%;
-  --fd-secondary: 232 47% 13%;
-  --fd-secondary-foreground: 240 5% 96%;
-
-  /* Accent here is the hover/active *surface*, not the brand color. */
-  --fd-accent: 232 37% 27%; /* #2C3360 */
-  --fd-accent-foreground: 240 5% 96%;
-  --fd-ring: 239 84% 67%;
+  /* Fumadocs v14 — DARK (HSL channels) */
+  --fd-background: 232 40% 4%;        /* canvas #06070e */
+  --fd-foreground: 225 22% 96%;       /* content #f4f5f8 */
+  --fd-card: 224 24% 7%;              /* surface #0e1017 */
+  --fd-card-foreground: 225 22% 96%;
+  --fd-popover: 224 24% 7%;
+  --fd-popover-foreground: 225 22% 96%;
+  --fd-muted: 220 20% 12%;            /* surface-raised #181c24 */
+  --fd-muted-foreground: 221 12% 59%; /* content-muted #8b93a4 */
+  --fd-border: 220 16% 18%;           /* border #262b35 */
+  --fd-primary: 244 81% 74%;          /* brand #8d85f2 */
+  --fd-primary-foreground: 232 40% 4%;
+  --fd-secondary: 220 20% 12%;
+  --fd-secondary-foreground: 225 22% 96%;
+  --fd-accent: 243 45% 17%;           /* brand-soft dark #1a1840 */
+  --fd-accent-foreground: 225 22% 96%;
+  --fd-ring: 244 81% 74%;             /* ring #8d85f2 */
 }
 
 /* ----------------------------------------------------------------------- *
- * Content polish — design brief 03 §7. Generic, framework-stable selectors
- * only (the docs body always renders real <pre>/<code>/<a> elements).
+ * Base + content polish — generic, framework-stable selectors only.
  * ----------------------------------------------------------------------- */
+html,
+body {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
 
 ::selection {
-  background: rgba(99, 102, 241, 0.32);
-  color: #f4f4f5;
+  background: color-mix(in srgb, var(--brand) 26%, transparent);
 }
 
 ::-webkit-scrollbar {
@@ -59,37 +115,37 @@ body {
   height: 9px;
 }
 ::-webkit-scrollbar-track {
-  background: #07091a;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2c3360;
+  background: var(--border-strong);
   border-radius: 5px;
 }
 
-/* Inline code — indigo-tinted pill (§7.3). Excludes code inside <pre>. */
+/* Inline code — indigo-tinted pill (excludes code inside <pre>). */
 :not(pre) > code {
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.18);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 0.875em;
   font-weight: 500;
-  font-family: var(--font-space-mono), monospace;
+  font-family: var(--font-mono), ui-monospace, monospace;
 }
 
-/* Code blocks — the hero surface (§7.4): dark well, clear border. */
+/* Code blocks — themed surface (Shiki dual-theme handles token colors per mode);
+   we only set the frame + mono font so syntax stays readable in light and dark. */
 pre {
-  background: #11152f !important;
-  border: 1px solid #1f2547;
-  border-radius: 10px;
-  font-family: var(--font-space-mono), monospace;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-mono), ui-monospace, monospace;
 }
 
-/* Focus rings — 2px indigo, never removed (§13). */
+/* Focus rings — 2px brand, never removed. */
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 summary:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

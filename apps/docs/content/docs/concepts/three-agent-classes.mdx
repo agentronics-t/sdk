@@ -1,15 +1,16 @@
 ---
-title: Three Agent Classes
-description: WebMCP, DOM-driver, and screenshot agents have different detection guarantees.
+title: Agent Classes
+description: WebMCP, crawler, DOM-driver, and screenshot agents have different detection guarantees.
 ---
 
-# Three Agent Classes
+# Agent Classes
 
-Agentronics models agents by how they interact with the page:
+Agentronics models agents by how they interact with the page. Each class comes with a different detection guarantee — knowing which class you're dealing with is what lets you set a sensible trust floor.
 
 | Class | Interaction path | Detection confidence |
 |---|---|---|
 | `webmcp` | Structured tools through `navigator.modelContext` | Stable, exact signal when present |
+| `crawler` | Fetches/renders pages; identifies itself in `navigator.userAgent` | Signature match — high but spoofable |
 | `dom` | Browser automation over DOM/click/type APIs | Beta, heuristic confidence score |
 | `screenshot` | Pixel-level mouse and keyboard control | Not reliably detectable client-side |
 
@@ -19,6 +20,12 @@ const identity = await client.detect()
 if (identity?.class === 'webmcp') {
   // Structured tool client.
 }
+
+if (identity?.class === 'crawler') {
+  // Known AI/search bot — identity.vendor is the bot name (e.g. 'GPTBot').
+}
 ```
 
-Screenshot agents should declare themselves with `presentIdentity()` or `authenticate()` if they need more trust than anonymous browsing.
+**Crawlers** (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Googlebot`, …) are matched by their User-Agent token. Because a UA is self-reported, the match is high-confidence but not proof (`confidence: 0.9`), and client-side detection only catches crawlers that execute JavaScript — see [Detection](/docs/detection#crawlers) for the full signature list and caveats.
+
+**Screenshot agents** should declare themselves with `presentIdentity()` or `authenticate()` if they need more trust than anonymous browsing.

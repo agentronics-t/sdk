@@ -32,7 +32,7 @@ const TYPES = [
   'sdk.error',
 ] as const
 
-const CLASSES = ['', 'webmcp', 'dom', 'screenshot'] as const
+const CLASSES = ['', 'webmcp', 'dom', 'screenshot', 'crawler'] as const
 
 const PROTOCOLS = [
   '',

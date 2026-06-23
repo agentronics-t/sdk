@@ -5,11 +5,12 @@ description: How the Agentronics SDK identifies which kind of agent — if any �
 
 # Detection
 
-The SDK identifies three classes of agent. They are not symmetric — some are exact-match, some are heuristic, some are not detectable at all from the page. Being upfront about that asymmetry is the most important thing on this page.
+The SDK identifies four classes of agent. They are not symmetric — some are exact-match, some are heuristic, some are not detectable at all from the page. Being upfront about that asymmetry is the most important thing on this page.
 
 | Class | How we detect | Confidence |
 |---|---|---|
 | **WebMCP** | `navigator.modelContext` is set by the agent's browser/extension | Exact — `confidence: 1` |
+| **Crawler** | `navigator.userAgent` matches a known AI/search bot signature | Signature — `confidence: 0.9` (spoofable) |
 | **DOM-driver** | A weighted bag of automation signals (Playwright, Puppeteer, Selenium…) | Heuristic — `confidence: 0.0–1.0` |
 | **Screenshot model** | Cannot be detected client-side. Use `declareAgent()`. | Declared — `trust: 'declared' \| 'verified'` |
 
@@ -25,16 +26,47 @@ const identity = await client.detect()
 // or null if no agent fires above threshold
 ```
 
-`detect()` runs WebMCP first (with a short poll for late-injecting extensions), then falls back to DOM heuristics. The first class that matches wins.
+`detect()` runs WebMCP first (with a short poll for late-injecting extensions), then a **known-crawler User-Agent match**, then DOM heuristics. The first class that matches wins.
 
 ## Tuning
 
 ```ts
 await client.detect({
-  webmcp: { pollMs: 500 },     // 0 to skip the poll, false to skip WebMCP entirely
-  dom:    { threshold: 0.4 },  // raise to be stricter, false to skip DOM heuristics
+  webmcp:  { pollMs: 500 },    // 0 to skip the poll, false to skip WebMCP entirely
+  crawler: { confidence: 0.9 },// false to skip crawler matching
+  dom:     { threshold: 0.4 }, // raise to be stricter, false to skip DOM heuristics
 })
 ```
+
+## Crawlers
+
+Crawlers are AI and search bots that fetch your pages — OpenAI's `GPTBot`, Anthropic's `ClaudeBot`, `PerplexityBot`, `Googlebot`, `Bingbot`, and friends. The SDK identifies them by matching `navigator.userAgent` against a signature table:
+
+```ts
+import { detectCrawler } from '@agentronics/sdk'
+
+const id = detectCrawler()
+// → { class: 'crawler', trust: 'detected', confidence: 0.9,
+//     vendor: 'GPTBot', signals: { matched: 'GPTBot', category: 'ai', ua } }
+// or null
+```
+
+`detectCrawler` is also wired into the `detect()` pipeline (after WebMCP, before DOM), so you usually don't call it directly. Bring your own signatures for first-party crawlers:
+
+```ts
+detectCrawler({
+  signatures: [
+    { name: 'AcmeBot', category: 'ai', pattern: /AcmeInternalCrawler/i },
+  ],
+})
+```
+
+The bundled table covers AI crawlers (`GPTBot`, `OAI-SearchBot`, `ChatGPT-User`, `ClaudeBot`, `anthropic-ai`, `PerplexityBot`, `Google-Extended`, `Applebot-Extended`, `Amazonbot`, `Bytespider`, `CCBot`, `Meta-ExternalAgent`, `cohere-ai`) and search crawlers (`Googlebot`, `Bingbot`, `DuckDuckBot`, `YandexBot`, `Baiduspider`, `Applebot`).
+
+### Two caveats — read these
+
+- **User-Agent is self-reported and spoofable.** A match is high-confidence, not proof, so we report `confidence: 0.9`, never `1`. Don't gate a security-critical decision on a crawler match alone — pair it with `declareAgent()` + a verification token if you need trust.
+- **Client-side detection only sees JS-executing crawlers.** Most crawlers fetch your HTML and never run the SDK, so they are invisible to `detectCrawler()`. Comprehensive crawler coverage needs **server/edge User-Agent inspection** — that belongs to a future edge product, not v0.1. Treat client-side crawler detection as a best-effort signal for the bots that do render.
 
 ## Agents declaring themselves
 
@@ -57,6 +89,6 @@ const id = declareAgent({
 
 - **No fingerprinting beyond detection.** No canvas hashes, no audio context probes, no font enumeration.
 - **No silent retries to defeat anti-detection tooling.** If a sophisticated DOM-driver scrubs `navigator.webdriver`, it passes as human and that's the right answer for v0.1.
-- **No server-side header inspection in v0.1.** That belongs to a future edge product.
+- **No server-side header inspection in v0.1.** That belongs to a future edge product — and it's exactly where comprehensive crawler detection will live.
 
 See `research/phase-0.5-detection-spike.md` in the repo for the full methodology, signal weights, and decision log.
