@@ -1,0 +1,88 @@
+---
+title: Connect to the dashboard
+description: Stream SDK events from your backend into the Agentronics Intelligence dashboard.
+---
+
+# Connect to the dashboard
+
+Every governed action the SDK takes — detections, auth, authz decisions, tool calls, memory access — is a [trace](/docs/observability). Stream those traces to the Agentronics Intelligence dashboard and they light up the **Detect, Auth, Authz, WebMCP Tools, Knaph, Logs, and Analytics** pages.
+
+The data flows **from your backend to ours**:
+
+```
+browser SDK ──traces──► your backend ──Bearer agtx_ik_…──► POST /v1/sdk/events ──► dashboard
+```
+
+## 1. Mint an ingest key
+
+In the dashboard, go to **Settings → SDK ingest keys → Create key** and copy the `agtx_ik_…` value. It's shown once.
+
+<Callout type="warn">
+  The ingest key is a **secret** — keep it on your server, never ship it to the
+  browser. The browser SDK should forward traces to your backend, which relays
+  them with the key (the key authenticates the tenant, the same way a publishable
+  key never leaves the client).
+</Callout>
+
+## 2. Stream events
+
+### Option A — any backend (plain HTTP)
+
+No SDK required on the server. `POST` a batch of trace events:
+
+```bash
+curl -X POST https://<your-intel-api>/v1/sdk/events \
+  -H "authorization: Bearer agtx_ik_…" \
+  -H "content-type: application/json" \
+  -d '{
+    "events": [
+      {
+        "id": "evt_1",
+        "siteId": "shop-acme",
+        "sessionId": "sess_1",
+        "occurredAt": "2026-06-23T12:00:00Z",
+        "type": "agent.detected",
+        "outcome": "success",
+        "agent": { "class": "crawler", "trust": "detected", "vendor": "GPTBot" }
+      }
+    ]
+  }'
+```
+
+Ingest is idempotent on the event `id`, so retries are safe. The response is `{ ok, accepted, deduped }`.
+
+### Option B — a Node backend running the SDK
+
+If your server runs the SDK, wire `createIntelExporter` into the tracer and events stream automatically:
+
+```ts
+import { init, createIntelExporter } from '@agentronics/sdk'
+
+const client = init({
+  publishableKey: process.env.AGENTRONICS_KEY!,
+  exporters: [
+    createIntelExporter({
+      url: process.env.INTEL_API_URL!,        // e.g. https://intel-api-….run.app
+      ingestKey: process.env.AGENTRONICS_INGEST_KEY!, // agtx_ik_…
+    }),
+  ],
+})
+```
+
+The exporter POSTs `TraceBatch`es to `/v1/sdk/events` with the key. It's server-only — the browser SDK can't send the secret key, so for client-side governance forward traces to your backend (e.g. via the webhook exporter) and relay them with Option A.
+
+## 3. Watch the pages populate
+
+Once events arrive, the dashboard's SDK pages fill in:
+
+| Page | Shows |
+|---|---|
+| Detect | Agents identified, by class (incl. crawlers) + vendor |
+| Auth | Identities presented, by protocol + trust |
+| Authz | Allow / blocked decisions |
+| WebMCP Tools | Synced registry, page-wise, with token cost |
+| Knaph | Site-memory snapshots + quality score |
+| Logs | Live event stream |
+| Analytics | Cross-pillar volume over time |
+
+Until the first event lands, each page shows an empty state pointing back to Settings.
