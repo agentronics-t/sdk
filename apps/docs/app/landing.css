@@ -1,7 +1,7 @@
 /* Docs home (app/page.tsx) — brand palette. Role tokens (--canvas/--surface/
    --content/--brand/--accent/--border/--radius-*) come from theme.css, which is
    imported globally in layout.tsx, so this file just consumes them. Fonts are
-   loaded via next/font in layout.tsx (--font-sans = DM Sans, --font-mono = JetBrains
+   loaded via next/font in layout.tsx (--font-sans = Geist, --font-mono = JetBrains
    Mono). */
 
 .landing {

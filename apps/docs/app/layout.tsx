@@ -1,15 +1,14 @@
 import type { ReactNode } from 'react'
 import { RootProvider } from 'fumadocs-ui/provider'
-import { DM_Sans, JetBrains_Mono } from 'next/font/google'
+import { Geist, JetBrains_Mono } from 'next/font/google'
 import 'fumadocs-ui/style.css'
 import './theme.css'
 
-// Brand typography (matches the marketing site + dashboard): DM Sans for UI/body,
+// Brand typography (matches the marketing site + dashboard): Geist for UI/body,
 // JetBrains Mono for code. Exposed as --font-sans / --font-mono, consumed by
 // theme.css and @agentronics/theme tokens.
-const dmSans = DM_Sans({
+const geist = Geist({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
   display: 'swap',
 })
@@ -36,7 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${dmSans.variable} ${jetbrainsMono.variable}`}
+      className={`${geist.variable} ${jetbrainsMono.variable}`}
     >
       <body>
         {/* Light by default with a working theme switcher, matching the brand

@@ -2,7 +2,7 @@
  *
  * Canonical tokens mirror landing_page_UI/Colors/agentronics-palette.html and the
  * marketing site: cool-slate neutrals, indigo #736ced primary, amber accent, with
- * DM Sans + JetBrains Mono (loaded in layout.tsx as --font-sans / --font-mono).
+ * Geist + JetBrains Mono (loaded in layout.tsx as --font-sans / --font-mono).
  *
  * The docs are intentionally self-contained: the shared @agentronics/theme package
  * still ships the OLD dark-only Space Mono palette (consumed by demo/dashboard), so

@@ -71,7 +71,42 @@ const client = init({
 
 The exporter POSTs `TraceBatch`es to `/v1/sdk/events` with the key. It's server-only — the browser SDK can't send the secret key, so for client-side governance forward traces to your backend (e.g. via the webhook exporter) and relay them with Option A.
 
-## 3. Watch the pages populate
+## 3. Push the tool registry + site memory
+
+Trace events are lightweight — they don't carry your full tool schemas/token costs or your site-memory snapshot. To light up the **WebMCP Tools** and **Knaph** pages, push those explicitly after `syncTools()` / `provideSiteMemory(...)`:
+
+```ts
+import { createIntelSync } from '@agentronics/sdk'
+
+const intel = createIntelSync({
+  url: process.env.INTEL_API_URL!,
+  ingestKey: process.env.AGENTRONICS_INGEST_KEY!,
+  siteId: 'shop-acme',
+})
+
+await intel.pushTools(client.tools.list({ includeDisabled: true })) // → WebMCP Tools
+await intel.pushMemory(client.siteMemory.get(), 82)                 // → Knaph (snapshot + score)
+```
+
+Or by plain HTTP (backend-agnostic):
+
+```bash
+# tool registry → WebMCP Tools page
+curl -X POST https://<intel-api>/v1/sdk/tools -H "authorization: Bearer agtx_ik_…" \
+  -H "content-type: application/json" \
+  -d '{ "siteId":"shop-acme", "tools":[
+        { "name":"cart.add","group":"cart","page":"browse",
+          "inputSchema":{…},"outputSchema":{…},"tokens":42 } ] }'
+
+# site-memory snapshot → Knaph page
+curl -X POST https://<intel-api>/v1/sdk/memory -H "authorization: Bearer agtx_ik_…" \
+  -H "content-type: application/json" \
+  -d '{ "siteId":"shop-acme", "snapshot":{ "siteMap":{…}, "policies":{…} }, "score":82 }'
+```
+
+Both are idempotent upserts — re-push whenever your registry or memory changes.
+
+## 4. Watch the pages populate
 
 Once events arrive, the dashboard's SDK pages fill in:
 

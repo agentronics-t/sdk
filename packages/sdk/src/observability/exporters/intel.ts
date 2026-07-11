@@ -1,5 +1,7 @@
 import type { TraceBatch, TraceEvent as TraceEventRecord } from '@agentronics/protocol'
 import type { TraceExporter } from '../tracer.js'
+import type { GovernedTool } from '../../tools/registry.js'
+import { toToolDescriptor } from '../../tools/toolSync.js'
 
 export interface IntelExporterOptions {
   /**
@@ -47,6 +49,66 @@ export const createIntelExporter = ({
       if (!response.ok) {
         throw new Error(`Intel exporter failed with status ${response.status}.`)
       }
+    },
+  }
+}
+
+export interface IntelSyncOptions {
+  /** Intelligence API base URL (e.g. `https://intel-api-….run.app`). */
+  url: string
+  /** Per-tenant SDK ingest key (`agtx_ik_…`). Backend-only — never the browser. */
+  ingestKey: string
+  /** The site these tools/memory belong to (matches your SDK `siteId`). */
+  siteId: string
+  fetcher?: typeof fetch
+}
+
+/**
+ * Push the authoritative tool registry + site-memory snapshot to the
+ * Intelligence dashboard — the full data the WebMCP Tools + Knaph pages need,
+ * which is too large for the lightweight trace stream. Call after `syncTools()`
+ * / `provideSiteMemory(...)`. Backend/server use only (the key is secret).
+ */
+export interface IntelSync {
+  /** POST the registry to /v1/sdk/tools. Returns the number of tools sent. */
+  pushTools(tools: GovernedTool[]): Promise<number>
+  /** POST the site-memory snapshot (+ optional quality score) to /v1/sdk/memory. */
+  pushMemory(snapshot: object, score?: number): Promise<void>
+}
+
+export const createIntelSync = ({
+  url,
+  ingestKey,
+  siteId,
+  fetcher = fetch,
+}: IntelSyncOptions): IntelSync => {
+  const base = url.replace(/\/$/, '')
+  const post = async (path: string, body: unknown): Promise<void> => {
+    const response = await fetcher(`${base}${path}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${ingestKey}`,
+      },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+      throw new Error(`Intel sync ${path} failed with status ${response.status}.`)
+    }
+  }
+
+  return {
+    async pushTools(tools: GovernedTool[]) {
+      const descriptors = tools.map(toToolDescriptor)
+      await post('/v1/sdk/tools', { siteId, tools: descriptors })
+      return descriptors.length
+    },
+    async pushMemory(snapshot: object, score?: number) {
+      await post('/v1/sdk/memory', {
+        siteId,
+        snapshot,
+        ...(typeof score === 'number' ? { score } : {}),
+      })
     },
   }
 }
