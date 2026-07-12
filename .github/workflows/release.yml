@@ -52,8 +52,13 @@ jobs:
       # workflow has to upgrade explicitly. Without this, provenance still
       # signs successfully but the publish PUT goes unauthenticated and
       # npm returns 404 (or ENEEDAUTH if no .npmrc is present).
+      #
+      # Pin to the npm 11.x line rather than @latest: npm 12+ requires
+      # Node >= 22, but .nvmrc pins Node 20.18.1, so `npm@latest` (now 12.x)
+      # aborts with EBADENGINE. npm 11.x still supports Node ^20.17.0 and is
+      # >= 11.5.1, satisfying the Trusted Publishing requirement.
       - name: Upgrade npm for Trusted Publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
