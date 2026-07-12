@@ -6,7 +6,7 @@ import { source } from '../../lib/source'
 const NavTitle = () => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
     <img src="/docs-static/icon.svg" alt="" width={22} height={22} style={{ borderRadius: 5 }} />
-    <span style={{ fontWeight: 700 }}>Agentronics</span>
+    <span style={{ fontWeight: 600, letterSpacing: '-0.02em' }}>agentronics</span>
     <span
       style={{
         fontSize: 10,
