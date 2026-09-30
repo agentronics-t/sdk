@@ -309,6 +309,12 @@ importers:
       '@agentronics/protocol':
         specifier: workspace:*
         version: link:../protocol
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
+      next:
+        specifier: '>=14'
+        version: 15.5.15(@playwright/test@1.59.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
       '@agentronics/eslint-config':
         specifier: workspace:*

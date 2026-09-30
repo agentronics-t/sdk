@@ -13,6 +13,11 @@ export const AuthProtocol = z.enum([
   'extension',
   'session-link',
   'x-agent-header',
+  // Server-side methods (@agentronics/sdk/server) — verified from the HTTP
+  // request itself, so they cover agents that never run page JavaScript.
+  'web-bot-auth', // RFC 9421 HTTP message signatures + key directory
+  'api-key', // agent API keys issued by the site
+  'verified-crawler', // UA claim confirmed by forward-confirmed reverse DNS
 ])
 export type AuthProtocol = z.infer<typeof AuthProtocol>
 

@@ -10,5 +10,10 @@ export { createGatewayExporter } from './exporters/gateway.js'
 export type { GatewayExporterOptions } from './exporters/gateway.js'
 export { createWebhookExporter } from './exporters/webhook.js'
 export type { WebhookExporterOptions } from './exporters/webhook.js'
-export { createIntelExporter, createIntelSync } from './exporters/intel.js'
+export {
+  createIntelExporter,
+  createIntelSync,
+  createDashboardExporter,
+  createDashboardSync,
+} from './exporters/intel.js'
 export type { IntelExporterOptions, IntelSync, IntelSyncOptions } from './exporters/intel.js'

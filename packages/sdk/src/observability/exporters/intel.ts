@@ -22,11 +22,13 @@ export interface IntelExporterOptions {
 const INGEST_PATH = '/v1/sdk/events'
 
 /**
- * Stream governed-action traces to the Agentronics Intelligence dashboard.
+ * Stream traces (agent sign-ins, verifications, access decisions) to the
+ * Agentronics dashboard.
  * POSTs a `TraceBatch` to the intel-api ingest endpoint with the ingest key.
  * Intended for Node/server use (the existing webhook exporter is browser-bound
  * and can't send an auth header).
  */
+/** @deprecated Use createDashboardExporter (same function). */
 export const createIntelExporter = ({
   url,
   ingestKey,
@@ -76,6 +78,7 @@ export interface IntelSync {
   pushMemory(snapshot: object, score?: number): Promise<void>
 }
 
+/** @deprecated Use createDashboardSync (same function). */
 export const createIntelSync = ({
   url,
   ingestKey,
@@ -112,3 +115,8 @@ export const createIntelSync = ({
     },
   }
 }
+
+/** Preferred name. Streams SDK traces to the Agentronics dashboard. */
+export const createDashboardExporter = createIntelExporter
+/** Preferred name for createIntelSync. */
+export const createDashboardSync = createIntelSync

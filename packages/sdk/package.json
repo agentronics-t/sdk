@@ -1,7 +1,7 @@
 {
   "name": "@agentronics/sdk",
   "version": "0.5.0",
-  "description": "Browser SDK for the Agentronics governance layer.",
+  "description": "Authentication for AI agents \u2014 verify every agent on your site (WebMCP, browser agents, crawlers, API agents) with any method: Web Bot Auth, API keys, OAuth2, SSO, SPIFFE, mTLS.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -24,6 +24,16 @@
       "types": "./dist/lite.d.ts",
       "import": "./dist/lite.js",
       "require": "./dist/lite.cjs"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    },
+    "./next": {
+      "types": "./dist/next.d.ts",
+      "import": "./dist/next.js",
+      "require": "./dist/next.cjs"
     }
   },
   "files": [
@@ -40,7 +50,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@agentronics/protocol": "workspace:*"
+    "@agentronics/protocol": "workspace:*",
+    "jose": "^6.2.3"
   },
   "devDependencies": {
     "@agentronics/eslint-config": "workspace:*",
@@ -72,5 +83,25 @@
   ],
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "peerDependencies": {
+    "next": ">=14"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "ai-agents",
+    "agent-authentication",
+    "web-bot-auth",
+    "http-message-signatures",
+    "rfc9421",
+    "webmcp",
+    "bot-verification",
+    "oauth2",
+    "mtls",
+    "spiffe"
+  ]
 }
