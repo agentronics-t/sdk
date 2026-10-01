@@ -1,0 +1,103 @@
+---
+title: Web Bot Auth
+description: Verify cryptographically signed agent requests (IETF Web Bot Auth, RFC 9421 HTTP message signatures).
+---
+
+# Web Bot Auth
+
+Web Bot Auth lets an agent **sign every HTTP request** with a key it publishes, so your server
+can prove who sent it — no shared secrets, no IP allowlists. It's the IETF standard
+(`draft-meunier-webbotauth-httpsig-protocol`) behind signed agents such as OpenAI's ChatGPT
+agent. Agentronics verifies it by default.
+
+## Setup
+
+Nothing to configure — Web Bot Auth is on in `agentronicsMiddleware()` and `createAgentAuth()`.
+A verified request resolves to:
+
+```ts
+{
+  status: 'verified',
+  agent: {
+    id: 'https://chatgpt.com',   // the signer — stable across requests
+    name: 'ChatGPT agent',
+    vendor: 'OpenAI',
+    method: 'web-bot-auth',
+    claims: { keyid: 'poqkLGiymh_W0uP6PZFw-dvez3QJT5SolqXBCW38r0U', alg: 'ed25519' },
+  },
+}
+```
+
+Signers we don't have a display name for are shown by hostname.
+
+## What the agent sends
+
+```http
+GET /products HTTP/1.1
+Host: shop.example
+Signature-Agent: agent1="https://signer.example"
+Signature-Input: sig1=("@authority" "signature-agent";key="agent1");created=1735689600;expires=1735693200;keyid="poqkLGiymh_W0uP6PZFw-dvez3QJT5SolqXBCW38r0U";alg="ed25519";nonce="…";tag="web-bot-auth"
+Signature: sig1=:RdNFx5Bj6au3YgAMQL/RzmUlZE8QZL…:
+```
+
+- `Signature-Agent` names the signer. Its keys live at
+  `https://signer.example/.well-known/http-message-signatures-directory`
+  (a JWK set), or at a JWKS URL when the member has `;type=jwks_uri`.
+- `Signature-Input` lists what was signed. It must cover `@authority` (or `@target-uri`) and
+  the `signature-agent` member, and carry `tag="web-bot-auth"`, `created`, `expires` and
+  `keyid` — the JWK SHA-256 thumbprint of the signing key.
+- The legacy form `Signature-Agent: "https://signer.example"` is accepted too.
+
+## What Agentronics checks
+
+1. The signature is tagged `web-bot-auth` (other HTTP signatures are ignored, not failed).
+2. `created` / `expires` are present, not in the future or past (60 s skew), and the window is
+   at most 24 hours.
+3. `@authority` or `@target-uri` and `signature-agent` are covered.
+4. The signer is allowed (see below) and is a safe public HTTPS URL.
+5. The key directory is fetched (cached per its `Cache-Control`, failures cached for 5 minutes)
+   and the key whose thumbprint equals `keyid` is selected — keyed on the (signer, key) pair.
+6. The RFC 9421 signature base is rebuilt and the signature verified. Supported algorithms:
+   `ed25519`, `rsa-pss-sha512`, `rsa-v1_5-sha256`, `ecdsa-p256-sha256`, `ecdsa-p384-sha384`.
+7. If a `nonce` is present it is recorded, and a replay is rejected.
+
+Our verifier is tested against the specification's published Ed25519 test vector.
+
+## Options
+
+```ts
+agentronicsMiddleware({
+  webBotAuth: {
+    allowedDirectories: ['https://chatgpt.com'], // default 'any' (behind SSRF guards)
+    clockSkewSec: 60,
+    maxValiditySec: 86_400,
+    requireNonce: false,
+    replayCache: myRedisReplayCache, // default: in-memory per instance
+  },
+})
+```
+
+| Option | Default | Notes |
+|---|---|---|
+| `allowedDirectories` | `'any'` | Restrict to specific signers. Others become `signer_not_allowed` without a network call. |
+| `clockSkewSec` | `60` | Tolerance for `created` / `expires`. |
+| `maxValiditySec` | `86400` | Longest accepted signature lifetime. |
+| `requireNonce` | `false` | Reject signatures without a `nonce`. |
+| `replayCache` | in-memory | Implement `{ has(key), add(key, ttlSeconds) }` on Redis/KV to share replay protection across instances. |
+| `authority` | request host | `(request, url) => string` — set when a proxy rewrites `Host`. |
+
+## Security notes
+
+- **The signer URL is attacker-controlled**, so directory fetches are guarded: HTTPS on port
+  443 only, no credentials, no IP literals or internal hostnames, no redirects, a 3 s timeout
+  and a 64 KiB cap. On Node the hostname is also resolved and private addresses are refused.
+  For the strictest posture, set `allowedDirectories`.
+- Behind a proxy that rewrites `Host`, set `authority`, otherwise valid signatures fail with
+  `bad_signature`.
+
+## Failure reasons
+
+Unverified results carry `reason: 'web-bot-auth:<code>'`: `expired`, `created_in_future`,
+`validity_window_too_long`, `signature_agent_not_covered`, `authority_or_target_uri_not_covered`,
+`signer_not_allowed`, `discovery_failed`, `unknown_keyid`, `bad_signature`, `replayed_nonce`,
+and parse errors. See [Error codes](/docs/reference/error-codes).

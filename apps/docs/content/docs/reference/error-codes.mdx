@@ -5,6 +5,39 @@ description: Every error code the gateway returns and what it means.
 
 # Error codes
 
+## Agent authentication (server)
+
+Unverified results from `@agentronics/sdk/server` carry `reason: '<method>:<code>'`. The first
+failing method's reason is reported.
+
+| Reason | Meaning |
+|---|---|
+| `web-bot-auth:signature_headers_incomplete` | `Signature` or `Signature-Input` is missing. |
+| `web-bot-auth:malformed_signature_headers` | The headers aren't valid structured fields. |
+| `web-bot-auth:created_and_expires_required` / `keyid_required` | A required signature parameter is missing. |
+| `web-bot-auth:created_in_future` / `expired` | The signature is outside its time window (60 s skew). |
+| `web-bot-auth:validity_window_too_long` | `expires − created` exceeds `maxValiditySec` (24 h). |
+| `web-bot-auth:authority_or_target_uri_not_covered` | Neither `@authority` nor `@target-uri` is signed. |
+| `web-bot-auth:signature_agent_not_covered` / `signature_agent_missing` | The `Signature-Agent` member isn't signed or sent. |
+| `web-bot-auth:signer_not_allowed` | The signer isn't in `allowedDirectories`. |
+| `web-bot-auth:invalid_signature_agent` | The signer isn't an HTTPS URL. |
+| `web-bot-auth:discovery_failed` | The key directory couldn't be fetched or parsed (cached 5 min), or its URL was unsafe. |
+| `web-bot-auth:unknown_keyid` | No key in the directory has this thumbprint. |
+| `web-bot-auth:bad_signature` | The signature doesn't verify — often a proxy rewriting `Host` (set `authority`). |
+| `web-bot-auth:replayed_nonce` | This nonce was already used. |
+| `api-key:unknown_or_revoked` | The key isn't known to your `verify` function. |
+| `oauth2:invalid_token:<code>` | Signature, issuer, audience or expiry check failed. |
+| `oauth2:missing_scopes:<scopes>` | Required scopes are missing. |
+| `crawler:rdns_mismatch` | The IP doesn't reverse-resolve to the crawler's domain, or forward DNS doesn't confirm it. |
+| `crawler:client_ip_unknown` | No trusted client-IP header — set `crawlers.clientIp`. |
+| `crawler:dns_unavailable_in_runtime` | Edge runtime without DNS — use the Node.js runtime. |
+| `crawler:no_rdns_method_for_vendor` | The operator doesn't publish reverse-DNS verification (try Web Bot Auth). |
+| `agent_claim_without_credentials` | It looks like an agent but presented nothing to verify. |
+
+Blocked requests get `403` `{ "error": "agent_not_allowed", "reason": "…" }`.
+
+## Gateway
+
 The gateway returns a JSON body with at minimum an `error` field on every non-2xx response. Codes are stable strings — the dashboard, the SDK's resilience layer, and your monitoring should switch on them.
 
 ## Authentication & authorization

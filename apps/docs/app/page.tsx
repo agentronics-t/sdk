@@ -2,12 +2,12 @@ import Link from 'next/link'
 import './landing.css'
 
 const PILLARS = [
-  { title: 'Detection', body: 'Identify WebMCP, crawler, DOM, and screenshot agents with a confidence-scored signal stack.', href: '/docs/detection' },
-  { title: 'Auth', body: 'Normalize OAuth, sessions, headers, and detection-as-auth into one trust level.', href: '/docs/auth' },
-  { title: 'Authorization', body: 'Enterprise policies enforced in the browser, audited in the gateway.', href: '/docs/authorization' },
-  { title: 'Site memory', body: 'Serve structured site context to agents instead of letting them screenshot.', href: '/docs/concepts/site-memory' },
-  { title: 'Observability', body: 'Every governed action becomes a trace with full agent + authz context.', href: '/docs/observability' },
-  { title: 'Tool management', body: 'Surface the right WebMCP tools to the right agents at the right time.', href: '/docs/concepts/tool-management' },
+  { title: 'Web Bot Auth', body: 'Verify cryptographically signed agents — RFC 9421 HTTP message signatures, as used by OpenAI’s ChatGPT agent.', href: '/docs/auth/web-bot-auth' },
+  { title: 'Agent API keys', body: 'Issue keys to the agents you and your customers run; verified on every request, hashed at rest.', href: '/docs/auth/api-keys' },
+  { title: 'Verified crawlers', body: 'Tell real Googlebot, Bingbot and Applebot from scrapers wearing their user agent.', href: '/docs/auth/verified-crawlers' },
+  { title: 'OAuth2 & enterprise identity', body: 'Client-credentials tokens, SSO/OIDC, SPIFFE and mTLS for agents with an identity provider.', href: '/docs/auth/overview' },
+  { title: 'Access rules', body: 'Allow or block unverified agents, keep allow and block lists — human traffic is never affected.', href: '/docs/access-rules' },
+  { title: 'Auth logs & sessions', body: 'Every sign-in, the method, and why it passed or failed — streamed to the console.', href: '/docs/auth-logs' },
 ]
 
 export default function HomePage() {
@@ -18,11 +18,11 @@ export default function HomePage() {
         <span>AGENTRONICS</span>
       </div>
       <header className="landing-hero">
-        <span className="landing-eyebrow">Agentronics SDK · v0.1.0</span>
-        <h1>Universal governance for agent-surfable websites.</h1>
+        <span className="landing-eyebrow">Agentronics SDK · v0.6</span>
+        <h1>Authentication for AI agents.</h1>
         <p className="landing-lede">
-          One SDK line. Six pillars in v0.1 (payments lands later). Every agent type — WebMCP-native,
-          crawler, DOM-based, screenshot-based — detected, authenticated, authorized, and audited.
+          Verify every agent on your site — signed agents, API agents, crawlers, WebMCP and browser
+          agents — with any method, and decide what each one may do.
         </p>
         <div className="landing-actions">
           <Link href="/docs/getting-started" className="landing-cta landing-cta--primary">
@@ -33,11 +33,11 @@ export default function HomePage() {
           </Link>
         </div>
         <pre className="landing-snippet">
-          <code>{`import { Agentronics } from '@agentronics/sdk'
+          <code>{`// middleware.ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
 
-Agentronics.init({
-  siteId: 'shop-acme-com',
-  apiKey: 'agtx_pk_live_…',
+export default agentronicsMiddleware({
+  rules: { unverified: 'block' },
 })`}</code>
         </pre>
       </header>
@@ -54,21 +54,21 @@ Agentronics.init({
 
       <section className="landing-meta">
         <div>
-          <h3>Lite ≤ 8 KB</h3>
-          <p>WebMCP-only sites pull a tree-shakeable build with the smallest possible footprint.</p>
+          <h3>Server + browser</h3>
+          <p>Middleware for Next.js, Express and any Fetch runtime; a browser SDK for in-page agents.</p>
         </div>
         <div>
-          <h3>Full ≤ 30 KB</h3>
-          <p>The complete six-pillar bundle including DOM enforcement and the gateway exporter.</p>
+          <h3>Standards-based</h3>
+          <p>IETF Web Bot Auth, RFC 9421 signatures, OAuth2, OIDC, SPIFFE and mTLS — no proprietary agent protocol.</p>
         </div>
         <div>
           <h3>Free tier</h3>
-          <p>1,000 governed tool calls per month on the managed gateway. No credit card required.</p>
+          <p>1,000 monthly active agents on Free. Human visitors are always free. No credit card required.</p>
         </div>
       </section>
 
       <footer className="landing-footer">
-        <span>Agentronics · agent governance, not agent control.</span>
+        <span>Agentronics · authentication for AI agents.</span>
         <Link href="/docs/reference/changelog">Changelog</Link>
       </footer>
     </main>

@@ -1,0 +1,62 @@
+---
+title: OAuth2
+description: Verify OAuth2 client-credentials access tokens issued to agents by your identity provider.
+---
+
+# OAuth2 agent tokens
+
+When agents get tokens from an identity provider — Auth0, Okta, Keycloak, Microsoft Entra, your
+own authorization server — verify those JWT access tokens directly. Available on **Pro** and
+above.
+
+## Setup
+
+```ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
+
+export default agentronicsMiddleware({
+  oauth2: {
+    issuer: 'https://auth.acme.example',
+    audience: 'https://shop.example',
+    // jwksUri defaults to `${issuer}/.well-known/jwks.json`
+    requiredScopes: ['agent:browse'],
+  },
+})
+```
+
+The agent sends `Authorization: Bearer <access token>`, typically obtained with the
+client-credentials grant.
+
+## What's checked
+
+- Signature against the issuer's JWKS (cached for an hour, refetched on unknown `kid`).
+- `iss` equals `issuer`, `aud` includes `audience`, `exp` / `nbf` with 30 s tolerance.
+- Algorithms limited to `RS256`, `PS256`, `ES256`, `EdDSA` (configurable with `algorithms`).
+- Every entry in `requiredScopes` is present in `scope` (or `scp`).
+
+## Result
+
+```ts
+{ status: 'verified', agent: { id: 'oauth2:research-agent', name: 'research-agent', vendor: null, method: 'oauth2', claims: { sub, scope } } }
+```
+
+The agent id is the token's `client_id` (falling back to `azp`, then `sub`). If the token
+carries `agent_name` or `agent_vendor` claims they're used for display.
+
+## Your users' tokens are ignored
+
+Only tokens whose `iss` is your configured `issuer` are treated as agent credentials. A user's
+session JWT from another issuer passes through as ordinary traffic (`status: 'none'`), so you
+can put the middleware in front of an API that also serves signed-in humans.
+
+## Options
+
+| Option | Default | |
+|---|---|---|
+| `issuer` | — | Required. Exact `iss` value. |
+| `audience` | — | Required. String or array. |
+| `jwksUri` | `${issuer}/.well-known/jwks.json` | |
+| `jwks` | — | A static `{ keys }` set instead of fetching (pinned keys, tests). |
+| `requiredScopes` | `[]` | |
+| `algorithms` | `['RS256','PS256','ES256','EdDSA']` | |
+| `clockToleranceSec` | `30` | |

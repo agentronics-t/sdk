@@ -318,8 +318,12 @@ export function withAgentHeaders(request: Request, result: AgentAuthResult): Hea
   return h
 }
 
-/** Read the forwarded result in a route handler (only trust it behind the middleware). */
-export function readAgentHeaders(headers: Headers) {
+/**
+ * Read the forwarded result in a route handler (only trust it behind the
+ * middleware). Accepts anything with `get()` — `Headers`, Next's read-only
+ * `headers()`, or a plain adapter.
+ */
+export function readAgentHeaders(headers: { get(name: string): string | null }) {
   const status = headers.get(AGENT_HEADERS.status) as AgentAuthResult['status'] | null
   return {
     status: status ?? 'none',

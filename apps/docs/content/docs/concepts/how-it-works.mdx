@@ -1,0 +1,62 @@
+---
+title: How it works
+description: The request flow, the result you get back, and how the server and browser halves fit together.
+---
+
+# How it works
+
+Every agent request goes through the same three steps: **authenticate**, **decide**, **record**.
+
+## 1. Authenticate
+
+The middleware inspects the incoming HTTP request and tries each enabled method, strongest
+first. The first one that verifies wins.
+
+| Order | Method | Looks at |
+|---|---|---|
+| 1 | [Web Bot Auth](/docs/auth/web-bot-auth) | `Signature`, `Signature-Input`, `Signature-Agent` headers |
+| 2 | [Agent API key](/docs/auth/api-keys) | `Authorization: Bearer agk_…` or `X-Agent-Key` |
+| 3 | [OAuth2](/docs/auth/oauth2) | `Authorization: Bearer <JWT>` from your configured issuer |
+| 4 | [Verified crawler](/docs/auth/verified-crawlers) | `User-Agent` + client IP, confirmed by reverse DNS |
+
+The result is one of three shapes:
+
+```ts
+type AgentAuthResult =
+  | { status: 'verified'; agent: { id; name; vendor; method; claims? } }
+  | { status: 'unverified'; reason; claimedName?; attempted }
+  | { status: 'none' } // no agent signals — treat as human traffic
+```
+
+- **`verified`** — a credential checked out. `agent.id` is stable (a signer URL,
+  `key:<agentId>`, `oauth2:<clientId>` or `crawler:<name>`), so you can key rules and sessions
+  on it.
+- **`unverified`** — the request looks like an agent (a bot user agent, a signature, a key)
+  but nothing verified. `reason` says why, e.g. `web-bot-auth:expired` or
+  `crawler:rdns_mismatch`.
+- **`none`** — no agent signals at all. Human visitors land here and are never affected.
+
+## 2. Decide
+
+[Access rules](/docs/access-rules) turn the result into `allow` or `block`. By default
+unverified agents are allowed (monitor mode), so you can watch real traffic before you enforce.
+
+## 3. Record
+
+Verified identity travels to your routes as `x-agentronics-*` request headers (forged ones are
+stripped first), and each decision can be streamed to the console as an
+[auth log](/docs/auth-logs).
+
+## Server and browser
+
+Some agents never execute your JavaScript — crawlers, API agents, most signed fetchers — so
+only the server half can see them. Others operate your page directly — WebMCP clients and
+browser agents — and the [browser SDK](/docs/auth/browser-agents) authenticates those in the
+page. Both produce the same identity model and the same [trust levels](/docs/concepts/trust-levels),
+and both stream to the same console.
+
+## What gets counted
+
+Each unique verified identity that authenticates in a month is one
+[monthly active agent](/docs/concepts/monthly-active-agents). Human visitors and unverified
+agents are never counted.

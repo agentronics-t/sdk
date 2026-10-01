@@ -1,0 +1,75 @@
+---
+title: Agent API keys
+description: Issue keys to the agents you or your customers run, and verify them on every request.
+---
+
+# Agent API keys
+
+API keys are the simplest credential for agents you know about — your own automations,
+partner integrations, customers' agents. Each key maps to one agent identity.
+
+## 1. Mint a key
+
+```ts
+import { generateAgentKey, hashAgentKey } from '@agentronics/sdk/server'
+
+const key = generateAgentKey()        // "agk_" + 32 random bytes (base64url)
+const hash = await hashAgentKey(key)  // SHA-256 hex — store this, never the key
+```
+
+Show `key` to the agent operator **once**; keep only `hash`.
+
+## 2. Verify keys in the middleware
+
+The simplest verifier reads a map of `sha256(key) → identity`, e.g. from an environment
+variable or config file:
+
+```ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
+import { staticKeyVerifier } from '@agentronics/sdk/server'
+
+export default agentronicsMiddleware({
+  apiKey: {
+    verify: staticKeyVerifier({
+      '3f1c…e9': { agentId: 'booking-agent', name: 'Booking agent', vendor: 'Acme', scopes: ['orders:read'] },
+    }),
+  },
+})
+```
+
+Or look keys up in your own database — `verify` receives the raw key and returns an identity
+or `null`:
+
+```ts
+apiKey: {
+  verify: async (key) => {
+    const row = await db.agentKeys.findByHash(await hashAgentKey(key))
+    return row && !row.revokedAt ? { agentId: row.agentId, name: row.name } : null
+  },
+}
+```
+
+## 3. The agent sends it
+
+```http
+GET /api/orders HTTP/1.1
+Authorization: Bearer agk_7Hq2…
+```
+
+`X-Agent-Key: agk_…` works too, for APIs where `Authorization` is already taken by user
+sessions.
+
+## Result
+
+```ts
+{ status: 'verified', agent: { id: 'key:booking-agent', name: 'Booking agent', vendor: 'Acme', method: 'api-key', claims: { scopes: ['orders:read'] } } }
+```
+
+An unknown or revoked key gives `status: 'unverified'` with `reason: 'api-key:unknown_or_revoked'`.
+
+## Notes
+
+- Only bearer tokens starting with the prefix (`agk_` by default, `apiKey.prefix` to change)
+  are treated as agent keys, so your users' ordinary session tokens are left alone.
+- Keys are compared by SHA-256 hash, so a database leak doesn't leak usable keys.
+- Rotate by issuing a new key, then removing the old hash once the agent has switched.

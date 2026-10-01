@@ -1,4 +1,4 @@
 {
-  "title": "Authentication",
-  "pages": ["overview", "sso", "spiffe", "google-agent", "mtls"]
+  "title": "Authentication methods",
+  "pages": ["overview", "web-bot-auth", "api-keys", "verified-crawlers", "oauth2", "browser-agents", "sso", "spiffe", "mtls", "google-agent"]
 }

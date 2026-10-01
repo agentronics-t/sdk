@@ -1,0 +1,59 @@
+---
+title: Verified crawlers
+description: Tell real search and AI crawlers from scrapers that borrow their user agent, using forward-confirmed reverse DNS.
+---
+
+# Verified crawlers
+
+Anyone can send `User-Agent: Googlebot`. Agentronics confirms the claim the way the crawler
+operators themselves document: **forward-confirmed reverse DNS**. The client IP's PTR name must
+sit under the vendor's domain *and* resolve back to the same IP.
+
+## Setup
+
+On by default. A verified crawler resolves to:
+
+```ts
+{ status: 'verified', agent: { id: 'crawler:Googlebot', name: 'Googlebot', vendor: null, method: 'verified-crawler', claims: { host: 'crawl-66-249-66-1.googlebot.com' } } }
+```
+
+A spoofed claim becomes `status: 'unverified'`, `reason: 'crawler:rdns_mismatch'`.
+
+## Coverage
+
+| Crawler | Verified against |
+|---|---|
+| Googlebot | `googlebot.com`, `google.com`, `googleusercontent.com` |
+| Bingbot | `search.msn.com` |
+| Applebot, Applebot-Extended | `applebot.apple.com` |
+| YandexBot | `yandex.ru`, `yandex.net`, `yandex.com` |
+| Baiduspider | `baidu.com`, `baidu.jp` |
+| Amazonbot | `crawl.amazonbot.amazon` |
+
+Other recognised crawlers (GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, PerplexityBot,
+CCBot, …) are identified by user agent but reported as `unverified` with
+`crawler:no_rdns_method_for_vendor`, because their operators don't publish reverse-DNS
+verification. Many of them sign requests with [Web Bot Auth](/docs/auth/web-bot-auth) instead,
+which verifies them.
+
+## The client IP must be trustworthy
+
+Verification is only as good as the client IP. By default Agentronics reads it **only from
+headers your platform sets and a caller can't forge**: `cf-connecting-ip` (Cloudflare), then
+`x-real-ip` / `x-vercel-forwarded-for` (Vercel). It never uses the leftmost
+`X-Forwarded-For` entry, which a caller controls.
+
+On other platforms, tell it where the IP is:
+
+```ts
+agentronicsMiddleware({
+  crawlers: { clientIp: (req) => req.headers.get('fly-client-ip') },
+})
+```
+
+## Runtime
+
+Reverse DNS needs Node's DNS resolver. On edge runtimes crawler claims stay unverified with
+`crawler:dns_unavailable_in_runtime` — they're never wrongly marked verified. For edge
+deployments, run the middleware on the Node.js runtime or rely on Web Bot Auth.
+Results are cached per IP (an hour when verified, ten minutes when not).

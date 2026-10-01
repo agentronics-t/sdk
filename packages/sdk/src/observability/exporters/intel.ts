@@ -5,7 +5,7 @@ import { toToolDescriptor } from '../../tools/toolSync.js'
 
 export interface IntelExporterOptions {
   /**
-   * Intelligence API base URL (e.g. `https://intel-api-….run.app`) — the
+   * Agentronics API base URL (shown in the console under Settings) — the
    * `/v1/sdk/events` path is appended automatically — or the full ingest URL.
    */
   url: string
@@ -56,7 +56,7 @@ export const createIntelExporter = ({
 }
 
 export interface IntelSyncOptions {
-  /** Intelligence API base URL (e.g. `https://intel-api-….run.app`). */
+  /** Agentronics API base URL (shown in the console under Settings). */
   url: string
   /** Per-tenant SDK ingest key (`agtx_ik_…`). Backend-only — never the browser. */
   ingestKey: string
@@ -67,7 +67,7 @@ export interface IntelSyncOptions {
 
 /**
  * Push the authoritative tool registry + site-memory snapshot to the
- * Intelligence dashboard — the full data the WebMCP Tools + Knaph pages need,
+ * Agentronics console — the full data the WebMCP Tools + Knaph pages need,
  * which is too large for the lightweight trace stream. Call after `syncTools()`
  * / `provideSiteMemory(...)`. Backend/server use only (the key is secret).
  */

@@ -7,6 +7,26 @@ description: Release notes for every published Agentronics package.
 
 This page is regenerated from [Changesets](https://github.com/changesets/changesets) on every release. The latest entry sits at the top.
 
+## v0.6.0 — unreleased
+
+Agentronics is now **authentication for AI agents**. This release adds the server half of the
+SDK, so agents that never run your JavaScript can be authenticated too.
+
+### `@agentronics/sdk`
+
+- **`@agentronics/sdk/server`** — `createAgentAuth()` with [Web Bot Auth](/docs/auth/web-bot-auth)
+  (RFC 9421 signed agents), [agent API keys](/docs/auth/api-keys), [OAuth2](/docs/auth/oauth2)
+  and [verified crawlers](/docs/auth/verified-crawlers); [access rules](/docs/access-rules);
+  `toTraceEvent()` for [auth logs](/docs/auth-logs).
+- **`@agentronics/sdk/next`** — `agentronicsMiddleware()` for Next.js; `expressAgentAuth()` and
+  `createAgentAuthHandler()` for Express and any Fetch runtime.
+- `createDashboardExporter` / `createDashboardSync` — new names for `createIntelExporter` /
+  `createIntelSync` (old names still work, now deprecated).
+
+### `@agentronics/protocol`
+
+- `AuthProtocol` adds `web-bot-auth`, `api-key` and `verified-crawler`.
+
 ## v0.1.0 — 2026-05-09
 
 The first publishable Agentronics release. Everything documented under [Concepts](/docs/concepts/three-agent-classes) and [Reference](/docs/reference/configuration) is live in this version.

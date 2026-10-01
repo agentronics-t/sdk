@@ -1,0 +1,72 @@
+---
+title: Access rules
+description: Decide which agents get in — block unverified agents, keep allow and block lists.
+---
+
+# Access rules
+
+Authentication tells you **who** an agent is. Access rules decide **whether it gets in**.
+They apply only to agent traffic — human visitors (`status: 'none'`) are always allowed.
+
+```ts
+agentronicsMiddleware({
+  rules: {
+    unverified: 'block',          // default 'allow'
+    block: ['Bytespider', 'crawler:CCBot'],
+    // allow: ['https://chatgpt.com', 'key:booking-agent'],  // allowlist mode
+  },
+})
+```
+
+## Rules
+
+| Rule | Effect | Plan |
+|---|---|---|
+| `unverified: 'allow'` *(default)* | Agents that don't authenticate are let through and logged — **monitor mode**. | All |
+| `unverified: 'block'` | Agents that don't authenticate get `403`. | All |
+| `block: [...]` | These agents are blocked even when verified. | Pro+ |
+| `allow: [...]` | **Allowlist mode**: only these verified agents are let in; other verified agents are blocked. | Pro+ |
+
+Entries in `block` and `allow` match an agent's **id**, **name** or **vendor**,
+case-insensitively — so `'OpenAI'`, `'ChatGPT agent'` and `'https://chatgpt.com'` all match
+the ChatGPT agent. Ids look like `https://chatgpt.com`, `key:<agentId>`, `oauth2:<clientId>`
+and `crawler:<name>`.
+
+## Order of evaluation
+
+1. No agent signals → **allow** (human traffic).
+2. Unverified → **allow** or **block** per `unverified`.
+3. Verified and on `block` → **block**.
+4. `allow` set and the agent isn't on it → **block**.
+5. Otherwise → **allow**.
+
+## Rolling out safely
+
+1. Ship with the defaults and watch [auth logs](/docs/auth-logs) for a few days.
+2. Give legitimate agents credentials — they'll show up as verified.
+3. Switch `unverified` to `'block'`.
+
+## Blocked responses
+
+Blocked requests get:
+
+```http
+HTTP/1.1 403 Forbidden
+Content-Type: application/json
+X-Agentronics-Decision: block
+
+{ "error": "agent_not_allowed", "reason": "unverified:crawler:rdns_mismatch" }
+```
+
+Customise it with `blockedResponse: (decision, result) => Response` — for example, to return
+a page explaining how agents can get a key.
+
+## Deciding yourself
+
+`decide()` is exposed if you'd rather make the call in your own code:
+
+```ts
+const auth = createAgentAuth()
+const result = await auth.authenticate(request)
+const decision = auth.decide(result, { unverified: 'block' }) // { action, reason }
+```

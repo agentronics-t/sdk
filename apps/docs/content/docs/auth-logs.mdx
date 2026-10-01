@@ -1,0 +1,70 @@
+---
+title: Auth logs & sessions
+description: Every agent sign-in and verification — who, how, and why it passed or failed.
+---
+
+# Auth logs & sessions
+
+Every authentication attempt becomes an **auth log** entry: which agent, which method, the
+trust it reached, the page, and — when it failed — the exact reason. In the Agentronics console
+they power the Logs, Agents and Sessions views and your
+[monthly active agent](/docs/concepts/monthly-active-agents) count.
+
+## What an entry contains
+
+```json
+{
+  "type": "auth.identity_presented",
+  "outcome": "success",
+  "agent": { "class": "crawler", "trust": "verified", "vendor": "OpenAI" },
+  "metadata": {
+    "protocol": "web-bot-auth",
+    "subject": "https://chatgpt.com",
+    "page": "/products",
+    "decision": "verified"
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `outcome` | `success` (verified), `error` (unverified) or `blocked` (an access rule blocked it) |
+| `metadata.protocol` | The method: `web-bot-auth`, `api-key`, `oauth2`, `verified-crawler`, `sso`, … |
+| `metadata.subject` | The verified agent id — the unit a session and an MAA are counted on |
+| `error` | For failures, the reason, e.g. `web-bot-auth:expired` |
+
+## Sending server-side results
+
+Turn each decision into a log entry with `toTraceEvent()` and ship it with the dashboard
+exporter — see [Stream auth events to the console](/docs/guides/connect-to-dashboard):
+
+```ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
+import { toTraceEvent } from '@agentronics/sdk/server'
+
+export default agentronicsMiddleware({
+  onResult: ({ result, decision, request }) => {
+    const event = toTraceEvent(result, decision, { siteId: 'shop', request })
+    if (event) exporter.export([event])
+  },
+})
+```
+
+Plain human traffic produces no entry.
+
+## Browser-side results
+
+The browser SDK emits the same `auth.identity_presented` events for in-page agents whenever
+`authenticate()`, `presentIdentity()` or detection changes the identity, so both halves land in
+one log.
+
+## Sessions
+
+A session groups one agent's activity: its verified id plus the pages and methods it used. In
+the console you can see active sessions per agent and when each agent was last seen.
+
+## Retention
+
+Raw log entries are kept for your plan's retention window — 7 days on Free, 30 on Pro, 90 on
+Business, custom on Enterprise. Daily roll-ups behind the charts are kept longer. On Business
+and above, logs can be exported for audit — see [Data export](/docs/enterprise/data-export).
