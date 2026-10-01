@@ -38,11 +38,12 @@ That's a working setup. With no options it:
 - verifies **signed agents** with [Web Bot Auth](/docs/auth/web-bot-auth) — e.g. OpenAI's ChatGPT agent,
 - verifies **search and AI crawlers** by [reverse DNS](/docs/auth/verified-crawlers), so a scraper
   claiming to be Googlebot doesn't pass,
-- lets unverified agents through (monitor mode) — you decide when to block them.
+- lets every request through — Agentronics never blocks.
 
-<Callout title="Human visitors are never affected">
-  A request with no agent signals gets `status: 'none'` and passes straight through. Access
-  rules only ever apply to agent traffic.
+<Callout title="Authentication, not blocking">
+  Agentronics never blocks anything. Unverified agents browse your site exactly as they did
+  before, and human visitors (`status: 'none'`) are untouched. Verified agents simply arrive
+  with an identity your app can use.
 </Callout>
 
 ## 3. Read the verified agent in your routes
@@ -85,18 +86,7 @@ export default agentronicsMiddleware({
 
 Agents send `Authorization: Bearer agk_…`. See [Agent API keys](/docs/auth/api-keys).
 
-## 5. Block unverified agents (when you're ready)
-
-```ts
-export default agentronicsMiddleware({
-  rules: { unverified: 'block' },
-})
-```
-
-Unverified agents now get a `403` with a JSON reason; verified agents and humans are
-unaffected. More in [Access rules](/docs/access-rules).
-
-## 6. See it in the console
+## 5. See it in the console
 
 Stream results to the Agentronics console to get auth logs, sessions and your
 [monthly active agents](/docs/concepts/monthly-active-agents) —

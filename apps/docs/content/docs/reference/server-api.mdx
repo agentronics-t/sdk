@@ -12,7 +12,7 @@ import { agentronicsMiddleware } from '@agentronics/sdk/next'
 
 ## `createAgentAuth(options?)`
 
-Returns `{ authenticate(request), decide(result, rules?) }`.
+Returns `{ authenticate(request) }`. It authenticates; it never blocks.
 
 ```ts
 const auth = createAgentAuth({
@@ -20,7 +20,6 @@ const auth = createAgentAuth({
   apiKey: { verify, prefix? },     // default: off
   oauth2: { issuer, audience, … }, // default: off
   crawlers: { clientIp?, resolver? } | false, // default: on
-  rules: { unverified?, block?, allow? },
 })
 ```
 
@@ -43,14 +42,6 @@ interface VerifiedAgent {
 
 Methods run strongest first; the first to verify wins. Failure reasons are listed in
 [Error codes](/docs/reference/error-codes).
-
-### `decide(result, rules?): Decision`
-
-```ts
-interface Decision { action: 'allow' | 'block'; reason: string }
-```
-
-See [Access rules](/docs/access-rules). `rules` defaults to the ones passed to `createAgentAuth`.
 
 ## Options
 
@@ -102,21 +93,22 @@ All `createAgentAuth` options, plus:
 
 | Option | Type | |
 |---|---|---|
-| `onResult` | `({ result, decision, request }) => void` | Called for agent traffic; never awaited on the request path. |
-| `blockedResponse` | `(decision, result) => Response` | Default: `403` JSON. |
+| `onResult` | `({ result, request }) => void` | Called for agent traffic; never awaited on the request path. |
 | `matcher` | `(url: URL) => boolean` | Return `false` to skip a path. |
 
-Returns `(request) => Promise<{ result, decision, headers, blocked }>`.
+Returns `(request) => Promise<{ result, headers }>`. Every request continues — there is no
+blocked outcome.
 
 ### `agentronicsMiddleware(options?)` — `@agentronics/sdk/next`
 
-Same options as `createAgentAuthHandler`. Returns a Next.js middleware function that responds
-with `blocked` or continues with the agent headers attached.
+Same options as `createAgentAuthHandler`. Returns a Next.js middleware function that always
+continues, with the agent headers attached. If authentication fails internally, the request
+continues untouched.
 
 ### `expressAgentAuth(options?)`
 
 Same options. Express/Connect middleware that sets `req.agent` and the `x-agentronics-*`
-request headers, or ends the request with the blocked response.
+request headers, then always calls `next()`.
 
 ## Helpers
 
@@ -124,7 +116,7 @@ request headers, or ends the request with the blocked response.
 |---|---|
 | `readAgentHeaders(headers)` | `{ status, id, name, vendor, method }` from forwarded headers. |
 | `withAgentHeaders(request, result)` | Headers to forward — forged `x-agentronics-*` removed, result set. |
-| `toTraceEvent(result, decision, { siteId, request })` | An auth-log event for the console, or `null` for human traffic. |
+| `toTraceEvent(result, { siteId, request })` | An auth-log event for the console, or `null` for human traffic. |
 | `generateAgentKey(prefix?)` | New `agk_` key (32 random bytes). |
 | `hashAgentKey(key)` | SHA-256 hex, for storage. |
 | `staticKeyVerifier(map)` | A `verify` function over `{ [sha256]: ApiKeyIdentity }`. |

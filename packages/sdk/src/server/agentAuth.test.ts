@@ -134,28 +134,6 @@ describe('verified crawlers (forward-confirmed reverse DNS)', () => {
   })
 })
 
-describe('access rules', () => {
-  const auth = createAgentAuth()
-  const verified = { status: 'verified' as const, agent: { id: 'https://chatgpt.com', name: 'ChatGPT agent', vendor: 'OpenAI', method: 'web-bot-auth' as const } }
-  const unverified = { status: 'unverified' as const, reason: 'x', attempted: [] }
-
-  it('allows unverified agents by default (monitor mode) and blocks them on request', () => {
-    expect(auth.decide(unverified)).toEqual({ action: 'allow', reason: 'unverified_allowed' })
-    expect(auth.decide(unverified, { unverified: 'block' })).toMatchObject({ action: 'block' })
-  })
-  it('blocklist matches id, name or vendor, case-insensitively', () => {
-    expect(auth.decide(verified, { block: ['openai'] })).toEqual({ action: 'block', reason: 'blocklisted' })
-    expect(auth.decide(verified, { block: ['ChatGPT agent'] })).toMatchObject({ action: 'block' })
-  })
-  it('allowlist mode blocks verified agents that are not listed', () => {
-    expect(auth.decide(verified, { allow: ['Anthropic'] })).toEqual({ action: 'block', reason: 'not_on_allowlist' })
-    expect(auth.decide(verified, { allow: ['https://chatgpt.com'] })).toEqual({ action: 'allow', reason: 'verified' })
-  })
-  it('never blocks human traffic', () => {
-    expect(auth.decide({ status: 'none' }, { unverified: 'block', allow: [] })).toMatchObject({ action: 'allow' })
-  })
-})
-
 describe('headers', () => {
   it('strips forged x-agentronics-* headers before setting the real result', () => {
     const forged = req({ [AGENT_HEADERS.status]: 'verified', [AGENT_HEADERS.id]: 'key:admin', 'X-Agentronics-Auth-Method': 'api-key' })
@@ -164,61 +142,69 @@ describe('headers', () => {
   })
 })
 
-describe('middleware', () => {
-  it('blocks with a 403 and reports the decision', async () => {
+describe('middleware never blocks', () => {
+  it('passes every request through and reports agent traffic', async () => {
     const onResult = vi.fn()
-    const handle = createAgentAuthHandler({ rules: { unverified: 'block' }, onResult })
+    const handle = createAgentAuthHandler({ onResult })
     const out = await handle(req({ 'user-agent': 'evil-scraper-bot' }))
-    expect(out.blocked?.status).toBe(403)
-    expect(await out.blocked?.json()).toMatchObject({ error: 'agent_not_allowed' })
+    expect(out).not.toHaveProperty('blocked')
+    expect(out.result).toMatchObject({ status: 'unverified' })
+    expect(readAgentHeaders(out.headers).status).toBe('unverified')
     await new Promise((r) => setTimeout(r, 0))
     expect(onResult).toHaveBeenCalledOnce()
   })
 
   it('does not report plain human traffic', async () => {
     const onResult = vi.fn()
-    const out = await createAgentAuthHandler({ onResult })(req())
-    expect(out.blocked).toBeNull()
+    await createAgentAuthHandler({ onResult })(req())
     await new Promise((r) => setTimeout(r, 0))
     expect(onResult).not.toHaveBeenCalled()
   })
 
-  it('express adapter sets req.agent and forwards headers, or ends blocked requests', async () => {
+  it('a throwing onResult never affects the request', async () => {
+    const handle = createAgentAuthHandler({ onResult: () => { throw new Error('boom') } })
+    await expect(handle(req({ 'user-agent': 'my-bot' }))).resolves.toMatchObject({ result: { status: 'unverified' } })
+  })
+
+  it('express adapter always calls next() — verified, unverified, and on internal errors', async () => {
     const key = generateAgentKey()
     const verify = staticKeyVerifier({ [await hashAgentKey(key)]: { agentId: 'a1' } })
-    const mw = expressAgentAuth({ apiKey: { verify }, rules: { unverified: 'block' } })
+    const run = async (mw: ReturnType<typeof expressAgentAuth>, headers: Record<string, string>) => {
+      const r = { method: 'GET', originalUrl: '/x', protocol: 'https', headers: { host: 'shop.example', ...headers } } as never as Parameters<typeof mw>[0]
+      const next = vi.fn()
+      await new Promise<void>((done) => mw(r, {}, (e?: unknown) => { next(e); done() }))
+      return { r, next }
+    }
+    const mw = expressAgentAuth({ apiKey: { verify } })
 
-    const okReq = { method: 'GET', originalUrl: '/x', protocol: 'https', headers: { host: 'shop.example', authorization: `Bearer ${key}`, [AGENT_HEADERS.id]: 'forged' } } as never as Parameters<typeof mw>[0]
-    const next = vi.fn()
-    await new Promise<void>((done) => mw(okReq, { statusCode: 200, setHeader() {}, end() {} }, (e?: unknown) => { next(e); done() }))
-    expect(next).toHaveBeenCalledWith(undefined)
-    expect(okReq.agent).toMatchObject({ status: 'verified' })
-    expect(okReq.headers[AGENT_HEADERS.id]).toBe('key:a1')
+    const ok = await run(mw, { authorization: `Bearer ${key}`, [AGENT_HEADERS.id]: 'forged' })
+    expect(ok.next).toHaveBeenCalledWith(undefined)
+    expect(ok.r.agent).toMatchObject({ status: 'verified' })
+    expect(ok.r.headers[AGENT_HEADERS.id]).toBe('key:a1')
 
-    const res = { statusCode: 200, headers: {} as Record<string, string>, body: '', setHeader(k: string, v: string) { this.headers[k] = v }, end(b?: string) { this.body = b ?? '' } }
-    const badReq = { method: 'GET', originalUrl: '/x', headers: { host: 'shop.example', 'user-agent': 'scraper-bot' } } as never as Parameters<typeof mw>[0]
-    await new Promise<void>((done) => {
-      const end = res.end.bind(res)
-      res.end = (b?: string) => { end(b); done() }
-      mw(badReq, res, () => done())
-    })
-    expect(res.statusCode).toBe(403)
-    expect(JSON.parse(res.body)).toMatchObject({ error: 'agent_not_allowed' })
+    const scraper = await run(mw, { 'user-agent': 'scraper-bot' })
+    expect(scraper.next).toHaveBeenCalledWith(undefined)
+    expect(scraper.r.agent).toMatchObject({ status: 'unverified' })
+
+    const broken = expressAgentAuth({ apiKey: { verify: () => { throw new Error('db down') } } })
+    const failed = await run(broken, { authorization: `Bearer ${key}`, [AGENT_HEADERS.id]: 'forged' })
+    expect(failed.next).toHaveBeenCalledWith(undefined)
+    expect(failed.r.agent).toEqual({ status: 'none' })
+    expect(failed.r.headers[AGENT_HEADERS.id]).toBeUndefined()
   })
 })
 
 describe('trace events', () => {
   it('produce events that pass the ingest schema', async () => {
-    const auth = createAgentAuth()
     const r = { status: 'verified' as const, agent: { id: 'https://chatgpt.com', name: 'ChatGPT agent', vendor: 'OpenAI', method: 'web-bot-auth' as const } }
-    const ev = toTraceEvent(r, auth.decide(r), { siteId: 'shop', request: req() })
+    const ev = toTraceEvent(r, { siteId: 'shop', request: req() })
     expect(() => TraceEvent.parse(ev)).not.toThrow()
     expect(ev).toMatchObject({ type: 'auth.identity_presented', outcome: 'success', metadata: { protocol: 'web-bot-auth', subject: 'https://chatgpt.com', page: '/products' } })
 
     const u = { status: 'unverified' as const, reason: 'crawler:rdns_mismatch', claimedName: 'Googlebot', attempted: ['verified-crawler' as const] }
-    const ev2 = toTraceEvent(u, { action: 'block', reason: 'unverified:x' }, { siteId: 'shop', request: req() })
+    const ev2 = toTraceEvent(u, { siteId: 'shop', request: req() })
     expect(() => TraceEvent.parse(ev2)).not.toThrow()
-    expect(ev2).toMatchObject({ outcome: 'blocked', error: 'crawler:rdns_mismatch' })
-    expect(toTraceEvent({ status: 'none' }, { action: 'allow', reason: '' }, { siteId: 's', request: req() })).toBeNull()
+    expect(ev2).toMatchObject({ outcome: 'error', error: 'crawler:rdns_mismatch' })
+    expect(toTraceEvent({ status: 'none' }, { siteId: 's', request: req() })).toBeNull()
   })
 })

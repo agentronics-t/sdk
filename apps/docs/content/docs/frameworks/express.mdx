@@ -20,7 +20,6 @@ app.use(
   expressAgentAuth({
     apiKey: { verify: staticKeyVerifier(JSON.parse(process.env.AGENT_KEYS ?? '{}')) },
     crawlers: { clientIp: (req) => req.headers.get('x-real-ip') }, // your proxy's client-IP header
-    rules: { unverified: 'allow' },
   })
 )
 
@@ -38,7 +37,8 @@ The middleware:
   or `none`),
 - sets the `x-agentronics-*` request headers for downstream code (forged ones are removed
   first),
-- ends blocked requests with `403` and a JSON body `{ error: 'agent_not_allowed', reason }`.
+- always calls `next()` — every request reaches your routes. If authentication fails
+  internally, `req.agent` is `{ status: 'none' }` and the request carries on.
 
 For TypeScript, extend the request type:
 

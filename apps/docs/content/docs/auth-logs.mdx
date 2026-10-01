@@ -20,22 +20,21 @@ they power the Logs, Agents and Sessions views and your
   "metadata": {
     "protocol": "web-bot-auth",
     "subject": "https://chatgpt.com",
-    "page": "/products",
-    "decision": "verified"
+    "page": "/products"
   }
 }
 ```
 
 | Field | Meaning |
 |---|---|
-| `outcome` | `success` (verified), `error` (unverified) or `blocked` (an access rule blocked it) |
+| `outcome` | `success` (verified) or `error` (unverified — the agent still browsed normally) |
 | `metadata.protocol` | The method: `web-bot-auth`, `api-key`, `oauth2`, `verified-crawler`, `sso`, … |
 | `metadata.subject` | The verified agent id — the unit a session and an MAA are counted on |
 | `error` | For failures, the reason, e.g. `web-bot-auth:expired` |
 
 ## Sending server-side results
 
-Turn each decision into a log entry with `toTraceEvent()` and ship it with the dashboard
+Turn each result into a log entry with `toTraceEvent()` and ship it with the dashboard
 exporter — see [Stream auth events to the console](/docs/guides/connect-to-dashboard):
 
 ```ts
@@ -43,8 +42,8 @@ import { agentronicsMiddleware } from '@agentronics/sdk/next'
 import { toTraceEvent } from '@agentronics/sdk/server'
 
 export default agentronicsMiddleware({
-  onResult: ({ result, decision, request }) => {
-    const event = toTraceEvent(result, decision, { siteId: 'shop', request })
+  onResult: ({ result, request }) => {
+    const event = toTraceEvent(result, { siteId: 'shop', request })
     if (event) exporter.export([event])
   },
 })

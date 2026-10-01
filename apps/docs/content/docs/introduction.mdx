@@ -8,10 +8,11 @@ description: Agentronics is authentication for AI agents — verify every agent 
 AI agents already visit your site: crawlers indexing it for answer engines, assistants
 fetching pages on a user's behalf, browser agents clicking through checkout, and API agents
 calling your endpoints. Most sites can't tell a real ChatGPT agent from a scraper wearing its
-user agent — so they either block everything or trust anything.
+user agent — every agent looks the same.
 
 **Agentronics gives every agent a verifiable identity**, the way an auth provider does for your
-human users: sign agents in, see who they are, and decide what each one may do.
+human users: sign agents in and see who they are. Agentronics never blocks — agents that
+don't authenticate keep browsing your site as normal.
 
 ## What you get
 
@@ -22,8 +23,8 @@ human users: sign agents in, see who they are, and decide what each one may do.
   [verified crawlers](/docs/auth/verified-crawlers), [SSO / OIDC](/docs/auth/sso),
   [SPIFFE](/docs/auth/spiffe), [mTLS](/docs/auth/mtls) and
   [browser-agent credentials](/docs/auth/browser-agents).
-- **[Access rules](/docs/access-rules).** Allow or block unverified agents, keep allow and block
-  lists, and pass the verified identity to your routes.
+- **Identity in your app.** Verified agents reach your routes with their identity attached as
+  request headers — who they are and how they proved it.
 - **[Auth logs & sessions](/docs/auth-logs).** Every sign-in and verification, with the method
   and the reason it passed or failed, in the Agentronics console.
 

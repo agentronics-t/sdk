@@ -38,9 +38,9 @@ const exporter = createDashboardExporter({
 })
 
 export default agentronicsMiddleware({
-  onResult: ({ result, decision, request }) => {
-    const event = toTraceEvent(result, decision, { siteId: 'shop-acme', request })
-    if (event) void exporter.export([event]).catch(() => {}) // never block the request
+  onResult: ({ result, request }) => {
+    const event = toTraceEvent(result, { siteId: 'shop-acme', request })
+    if (event) void exporter.export([event]).catch(() => {}) // never delays the request
   },
 })
 ```

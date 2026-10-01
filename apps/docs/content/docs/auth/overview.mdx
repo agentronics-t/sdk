@@ -49,5 +49,5 @@ For WebMCP clients and agents operating your page. See [Browser agents](/docs/au
 - **Add API keys** for agents you issue credentials to.
 - **Add OAuth2 or enterprise identity** when agents come from an organisation that already has
   an identity provider.
-- Keep unverified agents **allowed** until the logs show your real traffic, then
-  [block them](/docs/access-rules).
+- Agents without a credential are never turned away — they show up as unverified in your
+  [auth logs](/docs/auth-logs) and browse as usual.

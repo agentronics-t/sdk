@@ -26,7 +26,6 @@ import { staticKeyVerifier } from '@agentronics/sdk/server'
 
 export default agentronicsMiddleware({
   apiKey: { verify: staticKeyVerifier(JSON.parse(process.env.AGENT_KEYS ?? '{}')) },
-  rules: { unverified: 'allow' }, // switch to 'block' when you're ready
 })
 
 export const config = {
@@ -34,6 +33,9 @@ export const config = {
   runtime: 'nodejs', // needed for crawler reverse-DNS checks
 }
 ```
+
+Every request continues to your app — verified agents with their identity attached,
+everything else exactly as before. Agentronics never blocks.
 
 <Callout title="Edge or Node.js runtime?">
   Everything except [verified crawlers](/docs/auth/verified-crawlers) works on the edge
@@ -51,11 +53,10 @@ import { clerkMiddleware } from '@clerk/nextjs/server'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAgentAuthHandler } from '@agentronics/sdk/server'
 
-const agentAuth = createAgentAuthHandler({ rules: { unverified: 'block' } })
+const agentAuth = createAgentAuthHandler()
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const out = await agentAuth(req)
-  if (out.blocked) return out.blocked
   return NextResponse.next({ request: { headers: out.headers } })
 })
 ```
@@ -109,14 +110,14 @@ import { agentronicsMiddleware } from '@agentronics/sdk/next'
 import { toTraceEvent } from '@agentronics/sdk/server'
 
 export default agentronicsMiddleware({
-  onResult: ({ result, decision, request }) => {
-    const event = toTraceEvent(result, decision, { siteId: 'my-site', request })
+  onResult: ({ result, request }) => {
+    const event = toTraceEvent(result, { siteId: 'my-site', request })
     if (event) queueForExport(event) // see "Stream auth events to the console"
   },
 })
 ```
 
-`onResult` never blocks the request. See [Stream auth events to the console](/docs/guides/connect-to-dashboard).
+`onResult` never delays or affects the request. See [Stream auth events to the console](/docs/guides/connect-to-dashboard).
 
 ## Vite + React
 

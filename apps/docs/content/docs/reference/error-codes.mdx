@@ -34,7 +34,8 @@ failing method's reason is reported.
 | `crawler:no_rdns_method_for_vendor` | The operator doesn't publish reverse-DNS verification (try Web Bot Auth). |
 | `agent_claim_without_credentials` | It looks like an agent but presented nothing to verify. |
 
-Blocked requests get `403` `{ "error": "agent_not_allowed", "reason": "…" }`.
+These are reasons for your logs, not errors returned to the agent — an unverified agent's
+request continues to your site as normal.
 
 ## Gateway
 

@@ -6,7 +6,7 @@ const PILLARS = [
   { title: 'Agent API keys', body: 'Issue keys to the agents you and your customers run; verified on every request, hashed at rest.', href: '/docs/auth/api-keys' },
   { title: 'Verified crawlers', body: 'Tell real Googlebot, Bingbot and Applebot from scrapers wearing their user agent.', href: '/docs/auth/verified-crawlers' },
   { title: 'OAuth2 & enterprise identity', body: 'Client-credentials tokens, SSO/OIDC, SPIFFE and mTLS for agents with an identity provider.', href: '/docs/auth/overview' },
-  { title: 'Access rules', body: 'Allow or block unverified agents, keep allow and block lists — human traffic is never affected.', href: '/docs/access-rules' },
+  { title: 'Identity in your app', body: 'Verified agents reach your routes with who they are attached. Nothing is ever blocked — unverified agents browse as normal.', href: '/docs/concepts/how-it-works' },
   { title: 'Auth logs & sessions', body: 'Every sign-in, the method, and why it passed or failed — streamed to the console.', href: '/docs/auth-logs' },
 ]
 
@@ -22,7 +22,7 @@ export default function HomePage() {
         <h1>Authentication for AI agents.</h1>
         <p className="landing-lede">
           Verify every agent on your site — signed agents, API agents, crawlers, WebMCP and browser
-          agents — with any method, and decide what each one may do.
+          agents — with any method. No blocking: agents that don't authenticate browse as normal.
         </p>
         <div className="landing-actions">
           <Link href="/docs/getting-started" className="landing-cta landing-cta--primary">
@@ -36,9 +36,8 @@ export default function HomePage() {
           <code>{`// middleware.ts
 import { agentronicsMiddleware } from '@agentronics/sdk/next'
 
-export default agentronicsMiddleware({
-  rules: { unverified: 'block' },
-})`}</code>
+export default agentronicsMiddleware()
+// every request continues; verified agents carry x-agentronics-* headers`}</code>
         </pre>
       </header>
 

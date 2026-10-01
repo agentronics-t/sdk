@@ -3,11 +3,12 @@
  *
  *   // middleware.ts
  *   import { agentronicsMiddleware } from '@agentronics/sdk/next'
- *   export default agentronicsMiddleware({ rules: { unverified: 'block' } })
+ *   export default agentronicsMiddleware()
  *
- * Verified agents reach your routes with `x-agentronics-*` request headers
- * (read them with readAgentHeaders from '@agentronics/sdk/server'); blocked
- * agents get a 403. Runs on the edge runtime.
+ * Every request passes through. Verified agents reach your routes with
+ * `x-agentronics-*` request headers (read them with readAgentHeaders from
+ * '@agentronics/sdk/server'); unverified agents and humans browse as normal.
+ * Runs on the edge runtime.
  */
 import { createAgentAuthHandler, type AgentAuthHandlerOptions } from './middleware.js'
 
@@ -15,9 +16,13 @@ export function agentronicsMiddleware(options: AgentAuthHandlerOptions = {}) {
   const handle = createAgentAuthHandler(options)
   return async function middleware(request: Request): Promise<Response> {
     const { NextResponse } = await import('next/server')
-    const out = await handle(request)
-    if (out.blocked) return out.blocked
-    return NextResponse.next({ request: { headers: out.headers } })
+    try {
+      const out = await handle(request)
+      return NextResponse.next({ request: { headers: out.headers } })
+    } catch {
+      // never take the site down over authentication — continue unauthenticated
+      return NextResponse.next()
+    }
   }
 }
 

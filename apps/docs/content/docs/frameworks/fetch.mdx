@@ -5,20 +5,17 @@ description: Cloudflare Workers, Hono, Bun, Deno — anything that speaks the Fe
 
 # Any runtime (Fetch)
 
-`createAgentAuthHandler()` takes a standard `Request` and returns a verdict, so it runs
+`createAgentAuthHandler()` takes a standard `Request` and returns who sent it, so it runs
 anywhere the Fetch API does: Cloudflare Workers, Hono, Bun, Deno, Remix, SvelteKit, Astro.
 
 ```ts
 import { createAgentAuthHandler } from '@agentronics/sdk/server'
 
-const agentAuth = createAgentAuthHandler({
-  rules: { unverified: 'block' },
-})
+const agentAuth = createAgentAuthHandler()
 
 export default {
   async fetch(request: Request): Promise<Response> {
     const out = await agentAuth(request)
-    if (out.blocked) return out.blocked
 
     // forward to your origin with the verified identity attached
     return fetch(new Request(request, { headers: out.headers }))
@@ -31,9 +28,10 @@ export default {
 | Field | |
 |---|---|
 | `result` | `verified` / `unverified` / `none` — see [How it works](/docs/concepts/how-it-works) |
-| `decision` | `{ action: 'allow' \| 'block', reason }` from your [access rules](/docs/access-rules) |
 | `headers` | request headers to forward, with `x-agentronics-*` set and forged ones removed |
-| `blocked` | a ready `403` `Response` when the decision is `block`, else `null` |
+
+There's no "blocked" outcome — every request is forwarded. Agentronics authenticates; it
+never turns traffic away.
 
 ## Hono
 
@@ -46,13 +44,12 @@ const app = new Hono()
 
 app.use('*', async (c, next) => {
   const out = await agentAuth(c.req.raw)
-  if (out.blocked) return out.blocked
   c.set('agent', out.result)
   await next()
 })
 ```
 
-## Just the verdict
+## Just the result
 
 To authenticate without the handler wrapper — say, inside an existing request pipeline:
 
@@ -61,7 +58,7 @@ import { createAgentAuth } from '@agentronics/sdk/server'
 
 const auth = createAgentAuth()
 const result = await auth.authenticate(request)
-const decision = auth.decide(result)
+// { status: 'verified', agent } | { status: 'unverified', reason } | { status: 'none' }
 ```
 
 ## Runtime notes

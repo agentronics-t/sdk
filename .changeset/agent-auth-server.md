@@ -12,11 +12,13 @@ Authenticate agents from the HTTP request — `@agentronics/sdk/server` and `@ag
 - **Agent API keys** (`agk_…`, hashed at rest), **OAuth2** client-credentials JWTs
   (JWKS, issuer/audience/scopes), and **verified crawlers** (forward-confirmed
   reverse DNS; client IP from platform headers only).
-- `createAgentAuth()` → `authenticate(request)` + `decide()` access rules
-  (unverified allow/block, blocklist, allowlist); `withAgentHeaders()` strips
-  forged `x-agentronics-*` headers; `toTraceEvent()` feeds the dashboard.
-- Drop-ins: `agentronicsMiddleware()` for Next.js, `expressAgentAuth()` for
-  Express, `createAgentAuthHandler()` for anything Fetch-based.
+- `createAgentAuth()` → `authenticate(request)`. Authentication never blocks:
+  verified agents get a stable identity, unverified agents and humans browse as
+  normal. `withAgentHeaders()` strips forged `x-agentronics-*` headers;
+  `toTraceEvent()` feeds the console's auth logs.
+- Drop-ins that always pass requests through: `agentronicsMiddleware()` for
+  Next.js, `expressAgentAuth()` for Express, `createAgentAuthHandler()` for
+  anything Fetch-based. Internal errors fall back to unauthenticated traffic.
 - `createDashboardExporter` / `createDashboardSync` (preferred names;
   `createIntelExporter` / `createIntelSync` still work, now deprecated).
 - protocol: `AuthProtocol` gains `web-bot-auth`, `api-key`, `verified-crawler`.

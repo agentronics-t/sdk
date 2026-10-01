@@ -5,7 +5,7 @@ description: The request flow, the result you get back, and how the server and b
 
 # How it works
 
-Every agent request goes through the same three steps: **authenticate**, **decide**, **record**.
+Every agent request goes through the same three steps: **authenticate**, **pass through**, **record**. Nothing is ever blocked.
 
 ## 1. Authenticate
 
@@ -29,23 +29,23 @@ type AgentAuthResult =
 ```
 
 - **`verified`** — a credential checked out. `agent.id` is stable (a signer URL,
-  `key:<agentId>`, `oauth2:<clientId>` or `crawler:<name>`), so you can key rules and sessions
-  on it.
+  `key:<agentId>`, `oauth2:<clientId>` or `crawler:<name>`), so you can key sessions and your
+  own app logic on it.
 - **`unverified`** — the request looks like an agent (a bot user agent, a signature, a key)
   but nothing verified. `reason` says why, e.g. `web-bot-auth:expired` or
-  `crawler:rdns_mismatch`.
+  `crawler:rdns_mismatch`. The agent still browses your site normally.
 - **`none`** — no agent signals at all. Human visitors land here and are never affected.
 
-## 2. Decide
+## 2. Pass through
 
-[Access rules](/docs/access-rules) turn the result into `allow` or `block`. By default
-unverified agents are allowed (monitor mode), so you can watch real traffic before you enforce.
+Every request continues to your app — verified, unverified or human. The verified identity
+travels with it as `x-agentronics-*` request headers (forged ones are stripped first), so your
+routes know which agent they're talking to. If authentication itself ever fails internally,
+the request continues as unauthenticated traffic — Agentronics never takes your site down.
 
 ## 3. Record
 
-Verified identity travels to your routes as `x-agentronics-*` request headers (forged ones are
-stripped first), and each decision can be streamed to the console as an
-[auth log](/docs/auth-logs).
+Each agent sign-in can be streamed to the console as an [auth log](/docs/auth-logs).
 
 ## Server and browser
 

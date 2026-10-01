@@ -1,9 +1,11 @@
 /**
  * Agent authentication for any HTTP request — the server half of the SDK.
  *
- *   const auth = createAgentAuth({ apiKey: { verify }, rules: { unverified: 'block' } })
+ *   const auth = createAgentAuth({ apiKey: { verify } })
  *   const result = await auth.authenticate(request)   // Fetch API Request
- *   const decision = auth.decide(result)              // allow | block
+ *
+ * Authentication never blocks. A verified agent gets a stable identity your
+ * routes can read; an unverified agent (or a human) browses exactly as before.
  *
  * Methods, strongest first: Web Bot Auth (RFC 9421 signed agents), agent API
  * keys, OAuth2 client-credentials JWTs, and verified crawlers (forward-confirmed
@@ -65,15 +67,6 @@ export interface CrawlerOptions {
   resolver?: DnsResolver
 }
 
-export interface AccessRules {
-  /** Agent traffic that isn't verified. Default 'allow' (monitor mode). */
-  unverified?: 'allow' | 'block'
-  /** Always block — matches agent id, name or vendor (case-insensitive). */
-  block?: string[]
-  /** Allowlist mode: when set, verified agents not on it are blocked. */
-  allow?: string[]
-}
-
 export interface AgentAuthOptions {
   /** Web Bot Auth (on by default). `false` disables it. */
   webBotAuth?: boolean | WebBotAuthOptions
@@ -81,12 +74,6 @@ export interface AgentAuthOptions {
   oauth2?: OAuth2Options
   /** Verified crawlers (on by default). `false` disables it. */
   crawlers?: boolean | CrawlerOptions
-  rules?: AccessRules
-}
-
-export interface Decision {
-  action: 'allow' | 'block'
-  reason: string
 }
 
 /** Signers we can name. Everything else is shown by hostname. */
@@ -254,22 +241,7 @@ export function createAgentAuth(options: AgentAuthOptions = {}) {
     return { status: 'none' }
   }
 
-  function decide(result: AgentAuthResult, rules: AccessRules = options.rules ?? {}): Decision {
-    const norm = (s: string) => s.toLowerCase()
-    const matches = (list: string[] | undefined, a: VerifiedAgent) =>
-      !!list?.some((x) => [a.id, a.name, a.vendor ?? ''].map(norm).includes(norm(x)))
-    if (result.status === 'none') return { action: 'allow', reason: 'not_agent_traffic' }
-    if (result.status === 'unverified') {
-      return rules.unverified === 'block'
-        ? { action: 'block', reason: `unverified:${result.reason}` }
-        : { action: 'allow', reason: 'unverified_allowed' }
-    }
-    if (matches(rules.block, result.agent)) return { action: 'block', reason: 'blocklisted' }
-    if (rules.allow && !matches(rules.allow, result.agent)) return { action: 'block', reason: 'not_on_allowlist' }
-    return { action: 'allow', reason: 'verified' }
-  }
-
-  return { authenticate, decide }
+  return { authenticate }
 }
 
 // ---- helpers: API keys ---------------------------------------------------------
@@ -340,11 +312,7 @@ export function readAgentHeaders(headers: { get(name: string): string | null }) 
  * non-agent traffic. Server-side agents use class `crawler` (HTTP fetchers);
  * the method is in `metadata.protocol`.
  */
-export function toTraceEvent(
-  result: AgentAuthResult,
-  decision: Decision,
-  ctx: { siteId: string; request: Request }
-): TraceEvent | null {
+export function toTraceEvent(result: AgentAuthResult, ctx: { siteId: string; request: Request }): TraceEvent | null {
   if (result.status === 'none') return null
   const url = new URL(ctx.request.url)
   const verified = result.status === 'verified'
@@ -363,13 +331,12 @@ export function toTraceEvent(
       detectionVersion: '2026.09',
       signals: { surface: 'server' },
     },
-    outcome: decision.action === 'block' ? 'blocked' : verified ? 'success' : 'error',
+    outcome: verified ? 'success' : 'error',
     ...(verified ? {} : { error: result.reason }),
     metadata: {
       protocol: verified ? result.agent.method : (result.attempted[0] ?? 'none'),
       ...(verified ? { subject: result.agent.id } : {}),
       page: url.pathname,
-      decision: decision.reason,
     },
   }
 }

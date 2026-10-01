@@ -4,6 +4,7 @@
  * Works for agents that never run your page JavaScript: signed agents (Web Bot
  * Auth), API agents (agent keys, OAuth2), and crawlers (verified by reverse
  * DNS). Pair it with the browser SDK for in-page agents (WebMCP, browser agents).
+ * It authenticates; it never blocks.
  */
 export {
   createAgentAuth,
@@ -22,8 +23,6 @@ export {
   type ApiKeyIdentity,
   type OAuth2Options,
   type CrawlerOptions,
-  type AccessRules,
-  type Decision,
 } from './agentAuth.js'
 export {
   createAgentAuthHandler,
