@@ -15,7 +15,7 @@
     "@agentronics/protocol": "workspace:*",
     "@agentronics/theme": "workspace:*",
     "@clerk/nextjs": "^7.3.0",
-    "next": "^15.1.0",
+    "next": "^15.5.27",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "swr": "^2.4.1",

@@ -117,6 +117,16 @@ describe('verifyWebBotAuth — official test vector (draft-02 E.2.1)', () => {
     expect(r).toMatchObject({ status: 'invalid', reason: 'bad_signature' })
   })
 
+  it('authority pins the expected host (proxy rewrites / multi-host origins)', async () => {
+    // signed for example.com, arriving at the origin under another Host
+    const viaProxy = golden('https://internal-lb.example/')
+    expect(await verifyWebBotAuth(viaProxy, goldenOpts(directoryFetch()))).toMatchObject({ reason: 'bad_signature' })
+    __clearDirectoryCache()
+    expect(
+      await verifyWebBotAuth(viaProxy, { ...goldenOpts(directoryFetch()), authority: () => 'example.com' })
+    ).toMatchObject({ status: 'verified' })
+  })
+
   it('caches the key directory between requests', async () => {
     const fetch = directoryFetch()
     await verifyWebBotAuth(golden(), goldenOpts(fetch))

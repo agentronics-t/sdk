@@ -94,6 +94,12 @@ agentronicsMiddleware({
   For the strictest posture, set `allowedDirectories`.
 - Behind a proxy that rewrites `Host`, set `authority`, otherwise valid signatures fail with
   `bad_signature`.
+- **Pin your hostname if your server answers for any `Host`.** A signature is bound to the
+  `@authority` it was made for. If your origin accepts arbitrary `Host` headers (common for a
+  bare Node/Express server, not for Vercel or Cloudflare, which route by domain), someone could
+  replay a signature captured from another site within its validity window. Return your real
+  host from `authority` — e.g. `authority: () => 'shop.example'` — and enable `requireNonce`
+  with a shared `replayCache` for the strongest posture.
 
 ## Failure reasons
 
