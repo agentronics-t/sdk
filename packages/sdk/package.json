@@ -1,7 +1,7 @@
 {
   "name": "@agentronics/sdk",
-  "version": "0.5.0",
-  "description": "Authentication for AI agents \u2014 verify every agent on your site (WebMCP, browser agents, crawlers, API agents) with any method: Web Bot Auth, API keys, OAuth2, SSO, SPIFFE, mTLS.",
+  "version": "0.6.0",
+  "description": "Authentication for AI agents — verify every agent on your site (WebMCP, browser agents, crawlers, API agents) with any method: Web Bot Auth, API keys, OAuth2, SSO, SPIFFE, mTLS.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
