@@ -5,7 +5,7 @@ import { toToolDescriptor } from '../../tools/toolSync.js'
 
 export interface IntelExporterOptions {
   /**
-   * Intelligence API base URL (e.g. `https://intel-api-….run.app`) — the
+   * Agentronics API base URL (shown in the console under Settings) — the
    * `/v1/sdk/events` path is appended automatically — or the full ingest URL.
    */
   url: string
@@ -22,11 +22,13 @@ export interface IntelExporterOptions {
 const INGEST_PATH = '/v1/sdk/events'
 
 /**
- * Stream governed-action traces to the Agentronics Intelligence dashboard.
+ * Stream traces (agent sign-ins, verifications, access decisions) to the
+ * Agentronics dashboard.
  * POSTs a `TraceBatch` to the intel-api ingest endpoint with the ingest key.
  * Intended for Node/server use (the existing webhook exporter is browser-bound
  * and can't send an auth header).
  */
+/** @deprecated Use createDashboardExporter (same function). */
 export const createIntelExporter = ({
   url,
   ingestKey,
@@ -54,7 +56,7 @@ export const createIntelExporter = ({
 }
 
 export interface IntelSyncOptions {
-  /** Intelligence API base URL (e.g. `https://intel-api-….run.app`). */
+  /** Agentronics API base URL (shown in the console under Settings). */
   url: string
   /** Per-tenant SDK ingest key (`agtx_ik_…`). Backend-only — never the browser. */
   ingestKey: string
@@ -65,7 +67,7 @@ export interface IntelSyncOptions {
 
 /**
  * Push the authoritative tool registry + site-memory snapshot to the
- * Intelligence dashboard — the full data the WebMCP Tools + Knaph pages need,
+ * Agentronics console — the full data the WebMCP Tools + Knaph pages need,
  * which is too large for the lightweight trace stream. Call after `syncTools()`
  * / `provideSiteMemory(...)`. Backend/server use only (the key is secret).
  */
@@ -76,6 +78,7 @@ export interface IntelSync {
   pushMemory(snapshot: object, score?: number): Promise<void>
 }
 
+/** @deprecated Use createDashboardSync (same function). */
 export const createIntelSync = ({
   url,
   ingestKey,
@@ -112,3 +115,8 @@ export const createIntelSync = ({
     },
   }
 }
+
+/** Preferred name. Streams SDK traces to the Agentronics dashboard. */
+export const createDashboardExporter = createIntelExporter
+/** Preferred name for createIntelSync. */
+export const createDashboardSync = createIntelSync

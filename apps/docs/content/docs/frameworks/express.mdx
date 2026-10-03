@@ -1,0 +1,60 @@
+---
+title: Express
+description: Authenticate agents in an Express (or Connect) app with one middleware.
+---
+
+# Express
+
+```bash
+npm install @agentronics/sdk
+```
+
+```ts
+import express from 'express'
+import { expressAgentAuth, staticKeyVerifier } from '@agentronics/sdk/server'
+
+const app = express()
+app.set('trust proxy', true) // correct Host / protocol behind a load balancer
+
+app.use(
+  expressAgentAuth({
+    apiKey: { verify: staticKeyVerifier(JSON.parse(process.env.AGENT_KEYS ?? '{}')) },
+    crawlers: { clientIp: (req) => req.headers.get('x-real-ip') }, // your proxy's client-IP header
+  })
+)
+
+app.get('/api/products', (req, res) => {
+  if (req.agent?.status === 'verified') {
+    console.log(`${req.agent.agent.name} via ${req.agent.agent.method}`)
+  }
+  res.json({ products: [] })
+})
+```
+
+The middleware:
+
+- sets **`req.agent`** to the [result](/docs/concepts/how-it-works) (`verified`, `unverified`
+  or `none`),
+- sets the `x-agentronics-*` request headers for downstream code (forged ones are removed
+  first),
+- always calls `next()` — every request reaches your routes. If authentication fails
+  internally, `req.agent` is `{ status: 'none' }` and the request carries on.
+
+For TypeScript, extend the request type:
+
+```ts
+import type { AgentAuthResult } from '@agentronics/sdk/server'
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    agent?: AgentAuthResult
+  }
+}
+```
+
+## Client IP behind a proxy
+
+[Verified crawlers](/docs/auth/verified-crawlers) need the real client IP. By default only
+`cf-connecting-ip`, `x-real-ip` and `x-vercel-forwarded-for` are read. If your load balancer
+sets something else, pass `crawlers.clientIp` as above. Never trust the leftmost
+`X-Forwarded-For` entry — the caller controls it.

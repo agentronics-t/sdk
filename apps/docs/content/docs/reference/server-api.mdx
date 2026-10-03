@@ -1,0 +1,136 @@
+---
+title: Server API
+description: Reference for @agentronics/sdk/server and @agentronics/sdk/next.
+---
+
+# Server API
+
+```ts
+import { … } from '@agentronics/sdk/server'   // any Node ≥ 20 / edge / Workers runtime
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
+```
+
+## `createAgentAuth(options?)`
+
+Returns `{ authenticate(request) }`. It authenticates; it never blocks.
+
+```ts
+const auth = createAgentAuth({
+  webBotAuth: { … } | false,       // default: on
+  apiKey: { verify, prefix? },     // default: off
+  oauth2: { issuer, audience, … }, // default: off
+  crawlers: { clientIp?, resolver? } | false, // default: on
+})
+```
+
+### `authenticate(request: Request): Promise<AgentAuthResult>`
+
+```ts
+type AgentAuthResult =
+  | { status: 'verified'; agent: VerifiedAgent }
+  | { status: 'unverified'; reason: string; claimedName?: string; attempted: AgentAuthMethod[] }
+  | { status: 'none' }
+
+interface VerifiedAgent {
+  id: string              // signer URL | key:<agentId> | oauth2:<clientId> | crawler:<name>
+  name: string
+  vendor: string | null
+  method: 'web-bot-auth' | 'api-key' | 'oauth2' | 'verified-crawler'
+  claims?: Record<string, unknown>
+}
+```
+
+Methods run strongest first; the first to verify wins. Failure reasons are listed in
+[Error codes](/docs/reference/error-codes).
+
+## Options
+
+### `webBotAuth`
+
+| Option | Type | Default |
+|---|---|---|
+| `allowedDirectories` | `'any' \| string[]` | `'any'` |
+| `clockSkewSec` | `number` | `60` |
+| `maxValiditySec` | `number` | `86400` |
+| `requireNonce` | `boolean` | `false` |
+| `replayCache` | `{ has(key), add(key, ttlSeconds) }` | in-memory (10,000 entries) |
+| `authority` | `(request, url) => string` | request host |
+| `resolveDns` | `boolean` | `true` (Node only) |
+
+### `apiKey`
+
+| Option | Type | Default |
+|---|---|---|
+| `verify` | `(key) => ApiKeyIdentity \| null \| Promise<…>` | required |
+| `prefix` | `string` | `'agk_'` |
+
+`ApiKeyIdentity` is `{ agentId, name?, vendor?, scopes? }`.
+
+### `oauth2`
+
+| Option | Type | Default |
+|---|---|---|
+| `issuer` | `string` | required |
+| `audience` | `string \| string[]` | required |
+| `jwksUri` | `string` | `${issuer}/.well-known/jwks.json` |
+| `jwks` | `{ keys: JsonWebKey[] }` | — |
+| `requiredScopes` | `string[]` | `[]` |
+| `algorithms` | `string[]` | `['RS256','PS256','ES256','EdDSA']` |
+| `clockToleranceSec` | `number` | `30` |
+
+### `crawlers`
+
+| Option | Type | Default |
+|---|---|---|
+| `clientIp` | `'auto' \| 'cloudflare' \| 'vercel' \| (request) => string \| null` | `'auto'` |
+| `resolver` | `{ reverse(ip), lookup(host) }` | Node DNS |
+
+## Handlers
+
+### `createAgentAuthHandler(options?)`
+
+All `createAgentAuth` options, plus:
+
+| Option | Type | |
+|---|---|---|
+| `onResult` | `({ result, request }) => void` | Called for agent traffic; never awaited on the request path. |
+| `matcher` | `(url: URL) => boolean` | Return `false` to skip a path. |
+
+Returns `(request) => Promise<{ result, headers }>`. Every request continues — there is no
+blocked outcome.
+
+### `agentronicsMiddleware(options?)` — `@agentronics/sdk/next`
+
+Same options as `createAgentAuthHandler`. Returns a Next.js middleware function that always
+continues, with the agent headers attached. If authentication fails internally, the request
+continues untouched.
+
+### `expressAgentAuth(options?)`
+
+Same options. Express/Connect middleware that sets `req.agent` and the `x-agentronics-*`
+request headers, then always calls `next()`.
+
+## Helpers
+
+| Function | |
+|---|---|
+| `readAgentHeaders(headers)` | `{ status, id, name, vendor, method }` from forwarded headers. |
+| `withAgentHeaders(request, result)` | Headers to forward — forged `x-agentronics-*` removed, result set. |
+| `toTraceEvent(result, { siteId, request })` | An auth-log event for the console, or `null` for human traffic. |
+| `generateAgentKey(prefix?)` | New `agk_` key (32 random bytes). |
+| `hashAgentKey(key)` | SHA-256 hex, for storage. |
+| `staticKeyVerifier(map)` | A `verify` function over `{ [sha256]: ApiKeyIdentity }`. |
+| `verifyWebBotAuth(request, options?)` | The Web Bot Auth verifier on its own. |
+| `memoryReplayCache(maxEntries?)` | The default in-memory replay cache. |
+| `verifyCrawler(claim, ip, resolver?)` / `classifyUserAgent(ua)` | Crawler helpers. |
+| `jwkThumbprint(jwk)` | RFC 7638 thumbprint (base64url). |
+
+## Forwarded headers
+
+| Header | Value |
+|---|---|
+| `x-agentronics-agent-status` | `verified` \| `unverified` \| `none` |
+| `x-agentronics-agent-id` | `VerifiedAgent.id` |
+| `x-agentronics-agent-name` | `VerifiedAgent.name` |
+| `x-agentronics-agent-vendor` | `VerifiedAgent.vendor` (when known) |
+| `x-agentronics-auth-method` | `VerifiedAgent.method` |

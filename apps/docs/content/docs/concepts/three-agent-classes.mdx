@@ -1,11 +1,23 @@
 ---
-title: Agent Classes
-description: WebMCP, crawler, DOM-driver, and screenshot agents have different detection guarantees.
+title: Agent types
+description: Crawlers, API agents, WebMCP clients and browser agents — and which half of the SDK authenticates each.
 ---
 
-# Agent Classes
+# Agent types
 
-Agentronics models agents by how they interact with the page. Each class comes with a different detection guarantee — knowing which class you're dealing with is what lets you set a sensible trust floor.
+Agents reach your site in different ways, and the way they arrive decides where they can be
+authenticated.
+
+| Agent type | Examples | Authenticated by |
+|---|---|---|
+| Signed agents | OpenAI ChatGPT agent and other Web Bot Auth signers | Server — [Web Bot Auth](/docs/auth/web-bot-auth) |
+| API agents | Your own agents, partner integrations | Server — [API keys](/docs/auth/api-keys), [OAuth2](/docs/auth/oauth2), [mTLS](/docs/auth/mtls) |
+| Crawlers | Googlebot, Bingbot, GPTBot, ClaudeBot, PerplexityBot | Server — [verified crawlers](/docs/auth/verified-crawlers) or Web Bot Auth |
+| WebMCP & browser agents | Agents driving your UI or calling `navigator.modelContext` | Browser — [browser agents](/docs/auth/browser-agents) |
+
+## Browser agent classes
+
+Inside the page, the browser SDK models agents by how they interact with it. Each class comes with a different detection guarantee.
 
 | Class | Interaction path | Detection confidence |
 |---|---|---|
@@ -26,6 +38,6 @@ if (identity?.class === 'crawler') {
 }
 ```
 
-**Crawlers** (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Googlebot`, …) are matched by their User-Agent token. Because a UA is self-reported, the match is high-confidence but not proof (`confidence: 0.9`), and client-side detection only catches crawlers that execute JavaScript — see [Detection](/docs/detection#crawlers) for the full signature list and caveats.
+**Crawlers** (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Googlebot`, …) are matched by their User-Agent token. Because a UA is self-reported, the match is high-confidence but not proof (`confidence: 0.9`), and client-side detection only catches crawlers that execute JavaScript — for a verified answer, check crawlers on the server with [verified crawlers](/docs/auth/verified-crawlers), which sees every crawler (not just JavaScript-executing ones) and confirms the claim by reverse DNS.
 
 **Screenshot agents** should declare themselves with `presentIdentity()` or `authenticate()` if they need more trust than anonymous browsing.

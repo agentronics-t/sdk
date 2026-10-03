@@ -100,6 +100,8 @@ import {
   createWebhookExporter,
   createIntelExporter,
   createIntelSync,
+  createDashboardExporter,
+  createDashboardSync,
   type TraceExporter,
   type TraceInput,
   type Tracer,
@@ -156,6 +158,8 @@ export {
   createWebhookExporter,
   createIntelExporter,
   createIntelSync,
+  createDashboardExporter,
+  createDashboardSync,
 }
 export type {
   AgentronicsClient,

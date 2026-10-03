@@ -10,9 +10,15 @@ The trust ladder is ordered:
 | Trust | Meaning |
 |---|---|
 | `detected` | Signals indicate an agent, but no identity proof exists. |
-| `declared` | The agent identified itself. |
-| `verified` | A token or proof was verified. |
+| `declared` | The agent identified itself (a user agent, a self-declaration) — unproven. |
+| `verified` | A credential was verified: a Web Bot Auth signature, an agent API key, an OAuth2 or SSO token, a SPIFFE or mTLS identity, or forward-confirmed reverse DNS. |
 | `linked` | The verified agent is linked to a known user account. |
+
+Only gate sensitive actions on `verified` or `linked`. A `declared` identity is a hint: the
+agent (or a scraper pretending to be it) said who it is, and nothing checked.
+
+Server-side results map onto the ladder directly: `status: 'verified'` is `verified`, and
+`status: 'unverified'` is at most `declared`.
 
 ```ts
 const identity = await client.authenticate({

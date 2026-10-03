@@ -20,10 +20,10 @@
     "@agentronics/protocol": "workspace:*",
     "@agentronics/theme": "workspace:*",
     "@clerk/backend": "^1.21.4",
-    "@hono/node-server": "^1.13.7",
+    "@hono/node-server": "^1.19.15",
     "@neondatabase/serverless": "^0.10.4",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.18",
+    "hono": "^4.13.12",
     "jose": "^6.2.3",
     "zod": "^3.23.8"
   },

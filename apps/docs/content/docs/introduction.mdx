@@ -1,32 +1,45 @@
 ---
 title: Introduction
-description: What Agentronics is, who it is for, and the problem it solves.
+description: Agentronics is authentication for AI agents — verify every agent on your site, with any method.
 ---
 
-# Introduction
+# Authentication for AI agents
 
-**Agentronics is a universal governance layer for agent-surfable websites.**
+AI agents already visit your site: crawlers indexing it for answer engines, assistants
+fetching pages on a user's behalf, browser agents clicking through checkout, and API agents
+calling your endpoints. Most sites can't tell a real ChatGPT agent from a scraper wearing its
+user agent — every agent looks the same.
 
-Modern websites are no longer browsed only by humans. AI agents — Claude, ChatGPT, Perplexity, custom in-house agents — already navigate, click, and submit forms on behalf of users. Most sites have no way to tell an agent apart from a human, no way to declare which actions are safe for an agent to take, and no way to see what agents did after they left.
+**Agentronics gives every agent a verifiable identity**, the way an auth provider does for your
+human users: sign agents in and see who they are. Agentronics never blocks — agents that
+don't authenticate keep browsing your site as normal.
 
-Agentronics gives any website seven primitives, behind one SDK:
+## What you get
 
-1. **Detection** — identify which agent class is on the page (WebMCP, DOM-driver, screenshot model).
-2. **Authentication** — let agents present a verifiable identity, not just a user-agent string.
-3. **Authorization** — declare per-tool policies based on agent class and trust level.
-4. **Site Memory** — persist context across an agent's session so the user does not re-explain themselves.
-5. **Observability** — stream every agent action into a dashboard your team actually reads.
-6. **Tool Management** — register, version, and gate the tools an agent can call on your site.
-7. **Payments** — *(deferred to v0.2)* charge agents per action, settle to your account.
+- **Every kind of agent.** Signed agents, API agents, search and AI crawlers, WebMCP and
+  in-browser agents — one SDK, one identity model, one console.
+- **Every method.** [Web Bot Auth](/docs/auth/web-bot-auth) (signed HTTP requests),
+  [agent API keys](/docs/auth/api-keys), [OAuth2](/docs/auth/oauth2),
+  [verified crawlers](/docs/auth/verified-crawlers), [SSO / OIDC](/docs/auth/sso),
+  [SPIFFE](/docs/auth/spiffe), [mTLS](/docs/auth/mtls) and
+  [browser-agent credentials](/docs/auth/browser-agents).
+- **Identity in your app.** Verified agents reach your routes with their identity attached as
+  request headers — who they are and how they proved it.
+- **[Auth logs & sessions](/docs/auth-logs).** Every sign-in and verification, with the method
+  and the reason it passed or failed, in the Agentronics console.
 
-## Who this is for
+## Two halves, one identity
 
-- **Product engineers** at companies whose users are starting to ask for "agent support" on the marketing site, the dashboard, or the help center.
-- **Platform teams** standardizing how agents interact with internal tools across many properties.
-- **Indie builders** shipping agent-first products who want governance without writing it themselves.
+| | Runs | Authenticates |
+|---|---|---|
+| **Server** — `@agentronics/sdk/server` | Middleware on your server or edge (Next.js, Express, any Fetch runtime) | Anything that sends an HTTP request: signed agents, API agents, crawlers — including agents that never run your JavaScript |
+| **Browser** — `@agentronics/sdk` | In the page | WebMCP agents and browser agents operating your UI |
 
-## What ships in v0.1
+Most sites start with the server middleware — it sees 100% of agent traffic — and add the
+browser SDK when agents interact with the page itself.
 
-The first release is Detection + Auth + Authz + Memory + Observability + Tool Management. Payments lands in v0.2 once the first six are stable in production for our design partners. See the [changelog](/docs/reference/changelog) for the full v0.1.0 inventory.
+## Next
 
-Continue to [Getting Started](/docs/getting-started) to install the SDK in under five minutes.
+- **[Quickstart](/docs/getting-started)** — verify your first agent in five minutes.
+- **[How it works](/docs/concepts/how-it-works)** — the request flow, trust levels and results.
+- **[Authentication methods](/docs/auth/overview)** — choose methods for your agents.

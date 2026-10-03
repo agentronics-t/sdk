@@ -36,20 +36,20 @@ const PACKAGES: PackageReadme[] = [
   {
     pkg: 'packages/sdk',
     blurb:
-      'Browser SDK for the Agentronics governance layer — detection, auth normalization, policy enforcement, site memory, and trace export for every agent class.',
+      'Authentication for AI agents — verify every agent on your site (signed agents, API agents, crawlers, WebMCP and browser agents) with any method: Web Bot Auth, API keys, OAuth2, SSO, SPIFFE, mTLS.',
     sections: [
       { source: 'introduction', heading: 'Why Agentronics' },
-      { source: 'getting-started', heading: 'Getting started' },
+      { source: 'getting-started', heading: 'Quickstart' },
     ],
     footerLinks: SHARED_FOOTER,
   },
   {
     pkg: 'packages/react',
     blurb:
-      'React adapter for the Agentronics SDK. Provides `<AgentronicsProvider>` plus the `useGovernedTool`, `useAgentContext`, and `useSiteMemory` hooks.',
+      'React adapter for the Agentronics SDK — `<AgentronicsProvider>`, `useAgentronics()` and `useAgentContext()` to authenticate agents operating your pages.',
     sections: [
-      { source: 'guides/nextjs', heading: 'Next.js integration' },
-      { source: 'guides/vite-react', heading: 'Vite + React integration' },
+      { source: 'frameworks/nextjs', heading: 'Next.js' },
+      { source: 'frameworks/vite-react', heading: 'Vite + React' },
     ],
     footerLinks: SHARED_FOOTER,
   },
@@ -64,10 +64,9 @@ const PACKAGES: PackageReadme[] = [
     pkg: 'packages/gateway',
     blurb:
       'Hono-based gateway service that backs the Agentronics managed control plane. Internal package — operated by Agentronics, not for self-hosting.',
-    sections: [
-      { source: 'enterprise/deployment-options', heading: 'Deployment options' },
-      { source: 'enterprise/data-export', heading: 'Data export' },
-    ],
+    // (an 'enterprise/deployment-options' section used to be listed here but
+    // the page never existed, so the generator crashed before writing any README)
+    sections: [{ source: 'enterprise/data-export', heading: 'Data export' }],
     footerLinks: SHARED_FOOTER,
   },
 ]

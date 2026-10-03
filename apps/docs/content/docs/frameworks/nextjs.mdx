@@ -1,0 +1,117 @@
+---
+title: Next.js
+description: Authenticate every agent in a Next.js App Router app — middleware for all requests, the provider for in-page agents.
+---
+
+# Next.js
+
+Two pieces: **middleware** authenticates every request (signed agents, API agents, crawlers),
+and the **provider** authenticates agents operating your pages. Start with the middleware.
+
+## 1. Install
+
+```bash
+npm install @agentronics/sdk
+```
+
+## 2. Middleware
+
+```ts
+// middleware.ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
+import { staticKeyVerifier } from '@agentronics/sdk/server'
+
+export default agentronicsMiddleware({
+  apiKey: { verify: staticKeyVerifier(JSON.parse(process.env.AGENT_KEYS ?? '{}')) },
+})
+
+export const config = {
+  matcher: ['/((?!_next|.*\\..*).*)'],
+  runtime: 'nodejs', // needed for crawler reverse-DNS checks
+}
+```
+
+Every request continues to your app — verified agents with their identity attached,
+everything else exactly as before. Agentronics never blocks.
+
+<Callout title="Edge or Node.js runtime?">
+  Everything except [verified crawlers](/docs/auth/verified-crawlers) works on the edge
+  runtime. Reverse DNS needs Node, so set `runtime: 'nodejs'` (Next.js 15.5+). On the edge,
+  crawler claims stay unverified — never wrongly verified.
+</Callout>
+
+### Already using Clerk (or another auth middleware)?
+
+Compose them — run agent auth first, then your user auth:
+
+```ts
+// middleware.ts
+import { clerkMiddleware } from '@clerk/nextjs/server'
+import { NextResponse, type NextRequest } from 'next/server'
+import { createAgentAuthHandler } from '@agentronics/sdk/server'
+
+const agentAuth = createAgentAuthHandler()
+
+export default clerkMiddleware(async (auth, req: NextRequest) => {
+  const out = await agentAuth(req)
+  return NextResponse.next({ request: { headers: out.headers } })
+})
+```
+
+## 3. Use the verified agent
+
+In route handlers and server components:
+
+```ts
+import { headers } from 'next/headers'
+import { readAgentHeaders } from '@agentronics/sdk/server'
+
+const agent = readAgentHeaders(await headers())
+// { status: 'verified' | 'unverified' | 'none', id, name, vendor, method }
+```
+
+These headers are only trustworthy on routes behind the middleware — it strips any forged
+`x-agentronics-*` header before setting them.
+
+## 4. In-page agents (optional)
+
+To authenticate WebMCP clients and browser agents operating your pages, mount the provider:
+
+```bash
+npm install @agentronics/react
+```
+
+```tsx
+// app/agentronics-provider.tsx
+'use client'
+import type { ReactNode } from 'react'
+import { AgentronicsProvider } from '@agentronics/react'
+
+export function AgentronicsProviderRoot({ children }: { children: ReactNode }) {
+  return (
+    <AgentronicsProvider publishableKey={process.env.NEXT_PUBLIC_AGENTRONICS_KEY!} siteId="my-site">
+      {children}
+    </AgentronicsProvider>
+  )
+}
+```
+
+Wrap your root layout with it, then use `useAgentronics()` to reach the client
+(`client.detect()`, `client.authenticate()`). See
+[WebMCP & browser agents](/docs/auth/browser-agents).
+
+## 5. Send auth logs to the console
+
+```ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
+import { toTraceEvent } from '@agentronics/sdk/server'
+
+export default agentronicsMiddleware({
+  onResult: ({ result, request }) => {
+    const event = toTraceEvent(result, { siteId: 'my-site', request })
+    if (event) queueForExport(event) // see "Stream auth events to the console"
+  },
+})
+```
+
+`onResult` never delays or affects the request. See [Stream auth events to the console](/docs/guides/connect-to-dashboard).

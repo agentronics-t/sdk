@@ -1,0 +1,86 @@
+---
+title: WebMCP & browser agents
+description: Authenticate agents that operate your page — WebMCP clients and browser agents — with the browser SDK.
+---
+
+# WebMCP & browser agents
+
+Some agents don't just fetch your pages — they operate them: WebMCP clients calling
+`navigator.modelContext`, and browser agents clicking and typing through your UI. The browser
+SDK detects them in the page and upgrades them to a verified identity when they present a
+credential.
+
+## Install
+
+```bash
+npm install @agentronics/sdk
+```
+
+```ts
+import { Agentronics } from '@agentronics/sdk'
+
+const client = Agentronics.init({
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!, // agtx_pk_… — never a secret key
+  siteId: 'shop-acme-com',
+})
+
+const identity = await client.detect()
+// → { class: 'webmcp', trust: 'detected', vendor: …, confidence: 1, … } or null
+```
+
+Passing a secret key (`agtx_sk_…`) throws at `init()`, so a leak fails loudly. React? Use
+`<AgentronicsProvider>` from `@agentronics/react` — see [Next.js](/docs/frameworks/nextjs).
+
+## From detected to verified
+
+| Step | Call | Trust |
+|---|---|---|
+| Agent is present | automatic on `init()` (`autoDetect`) | `detected` |
+| Agent says who it is | `client.presentIdentity({ class, vendor, token })` | `declared` |
+| Credential verified | `client.authenticate({ … })` + a `verifyToken` hook | `verified` |
+| Linked to a user | `client.authenticate({ sessionLinkToken, linkedUserId })` | `linked` |
+
+`client.detect()` always returns the highest-trust identity available.
+
+## Verifying credentials
+
+A browser can't safely verify a credential by itself, so `authenticate()` hands tokens to a
+`verifyToken` hook that calls your server (which can use the Agentronics gateway or your own
+logic):
+
+```ts
+const client = Agentronics.init({
+  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
+  auth: {
+    verifyToken: async (method, token) => {
+      const res = await fetch('/api/agent/verify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ method, token }),
+      })
+      return res.ok ? res.json() : null // a VerificationResult, or null
+    },
+  },
+})
+
+await client.authenticate({ bearerToken: 'agt_bearer_…', vendorHint: 'claude', classHint: 'webmcp' })
+```
+
+Supported inputs: `bearerToken`, `extensionToken`, `oauth2AccessToken`, `ssoIdToken`,
+`spiffeJwt`, `xfccHeader`, `sessionLinkToken` (+ `linkedUserId`), `xAgentHeader` and a
+`declaration`. SSO, SPIFFE and mTLS are verified by the gateway — see [SSO](/docs/auth/sso),
+[SPIFFE](/docs/auth/spiffe) and [mTLS](/docs/auth/mtls).
+
+## Handing back to a human
+
+When an agent returns control to a person, call `client.clearIdentity()`.
+
+## What detection can and can't see
+
+- **WebMCP** — exact when an agent uses `navigator.modelContext`.
+- **DOM drivers** (Playwright-style automation) — heuristic, with a confidence score.
+- **Screenshot agents** (pixel-level control) — not reliably detectable; they should
+  authenticate if they need more than anonymous access.
+
+Pair the browser SDK with the [server middleware](/docs/getting-started): the server sees
+every request, the browser sees what happens on the page.

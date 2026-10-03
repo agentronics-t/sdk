@@ -1,4 +1,14 @@
 {
   "title": "Documentation",
-  "pages": ["introduction", "getting-started", "concepts", "guides", "detection", "observability", "auth", "authorization", "enterprise", "reference"]
+  "pages": [
+    "introduction",
+    "getting-started",
+    "concepts",
+    "auth",
+    "frameworks",
+    "auth-logs",
+    "guides",
+    "enterprise",
+    "reference"
+  ]
 }

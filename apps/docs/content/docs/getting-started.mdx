@@ -1,80 +1,99 @@
 ---
-title: Getting Started
-description: Install the Agentronics SDK and govern your first agent action in five minutes.
+title: Quickstart
+description: Verify your first AI agent in five minutes with the Agentronics middleware.
 ---
 
-# Getting Started
+# Quickstart
 
-This walkthrough assumes you have a Node 18+ project and a publishable API key (`agtx_pk_...`) from the Agentronics dashboard. If you do not have a key yet, sign up at [agentronics.dev](https://agentronics.dev) — the free tier is enough to follow along.
+This guide adds agent authentication to a Next.js app. You'll verify signed agents and
+crawlers out of the box, then add API keys for your own agents. Using Express or another
+runtime? The steps are the same — see [Express](/docs/frameworks/express) or
+[any Fetch runtime](/docs/frameworks/fetch).
 
-### Step 1 — Install
+## 1. Install
 
 ```bash
 npm install @agentronics/sdk
-# or: pnpm add @agentronics/sdk
-# or: yarn add @agentronics/sdk
 ```
 
-If you only need WebMCP detection and want the smallest possible bundle, import the `lite` entry instead:
+## 2. Add the middleware
 
 ```ts
-import { init } from '@agentronics/sdk/lite'
-```
+// middleware.ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
 
-### Step 2 — Initialize in the browser
+export default agentronicsMiddleware()
 
-Call `Agentronics.init` once, as early as possible in your app's client entry. Pass your **publishable** key — never your secret key.
-
-```ts
-import { Agentronics } from '@agentronics/sdk'
-
-const client = Agentronics.init({
-  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
-  siteId: 'shop-acme-com',
-  trace: { gateway: true },
-})
-```
-
-The SDK will throw a clear error if you accidentally pass a secret key (`agtx_sk_...`), so leaks fail loud rather than silent. Setting `trace.gateway: true` wires the gateway exporter so traces show up in the dashboard's `/live` feed within ~2 seconds.
-
-### Step 3 — React: wrap your app
-
-If you use React, install the bindings and use the provider:
-
-```bash
-npm install @agentronics/react
-```
-
-```tsx
-import { AgentronicsProvider } from '@agentronics/react'
-
-export default function App({ children }) {
-  return (
-    <AgentronicsProvider publishableKey={process.env.NEXT_PUBLIC_AGENTRONICS_KEY!}>
-      {children}
-    </AgentronicsProvider>
-  )
+export const config = {
+  // every page and API route; skip static assets
+  matcher: ['/((?!_next|.*\\..*).*)'],
+  // Node.js runtime so crawler claims can be checked by reverse DNS
+  // (on the default edge runtime they stay unverified — never wrongly verified)
+  runtime: 'nodejs',
 }
 ```
 
-Then access the client from any component with `useAgentronics()`. The `useGovernedTool`, `useAgentContext`, and `useSiteMemory` hooks are also exported — see the [Next.js guide](/docs/guides/nextjs) for usage.
+That's a working setup. With no options it:
 
-### Step 4 — Confirm it is live
+- verifies **signed agents** with [Web Bot Auth](/docs/auth/web-bot-auth) — e.g. OpenAI's ChatGPT agent,
+- verifies **search and AI crawlers** by [reverse DNS](/docs/auth/verified-crawlers), so a scraper
+  claiming to be Googlebot doesn't pass,
+- lets every request through — Agentronics never blocks.
 
-Open your site, then open the Agentronics dashboard `/live` page. You should see your first session appear within ~2 seconds. If nothing shows up, double-check that:
+<Callout title="Authentication, not blocking">
+  Agentronics never blocks anything. Unverified agents browse your site exactly as they did
+  before, and human visitors (`status: 'none'`) are untouched. Verified agents simply arrive
+  with an identity your app can use.
+</Callout>
 
-- the key starts with `agtx_pk_`,
-- the script runs on the client (not only at build time),
-- `trace.gateway: true` is set on `Agentronics.init`,
-- and your domain is in the gateway's `ALLOWED_ORIGINS`.
+## 3. Read the verified agent in your routes
 
-### Step 5 — Next
+The middleware forwards the result as request headers. Read them with `readAgentHeaders`:
 
-Once detection is working, continue to:
+```ts
+// app/api/products/route.ts
+import { headers } from 'next/headers'
+import { readAgentHeaders } from '@agentronics/sdk/server'
 
-- **[Authorization](/docs/authorization)** — declare which agents can call which tools.
-- **[Site Memory](/docs/concepts/site-memory)** — give agents structured context about your site.
-- **[Observability](/docs/observability)** — stream events into your own analytics.
-- **[Plain HTML / CDN](/docs/guides/plain-html)** — drop the SDK into a static page with one script tag.
+export async function GET() {
+  const agent = readAgentHeaders(await headers())
 
-Each of those has its own guide in this docs site. Welcome to Agentronics.
+  if (agent.status === 'verified') {
+    console.log(`${agent.name} (${agent.method}) is reading products`)
+  }
+  return Response.json({ products: [] })
+}
+```
+
+The middleware strips any `x-agentronics-*` header the caller sent, so these values can't be
+forged — as long as the route sits behind the middleware.
+
+## 4. Give your own agents API keys
+
+For agents you or your customers run, issue agent API keys:
+
+```ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
+import { staticKeyVerifier } from '@agentronics/sdk/server'
+
+export default agentronicsMiddleware({
+  apiKey: {
+    // sha256(key) → identity; mint keys with generateAgentKey()
+    verify: staticKeyVerifier(JSON.parse(process.env.AGENT_KEYS ?? '{}')),
+  },
+})
+```
+
+Agents send `Authorization: Bearer agk_…`. See [Agent API keys](/docs/auth/api-keys).
+
+## 5. See it in the console
+
+Stream results to the Agentronics console to get auth logs, sessions and your
+[monthly active agents](/docs/concepts/monthly-active-agents) —
+see [Stream auth events to the console](/docs/guides/connect-to-dashboard).
+
+## Next
+
+- **[Authentication methods](/docs/auth/overview)** — OAuth2, SSO, SPIFFE, mTLS and more.
+- **[Browser agents](/docs/auth/browser-agents)** — authenticate WebMCP and in-page agents too.
+- **[Server API reference](/docs/reference/server-api)** — every option and result field.

@@ -1,0 +1,70 @@
+---
+title: Any runtime (Fetch)
+description: Cloudflare Workers, Hono, Bun, Deno — anything that speaks the Fetch API Request/Response.
+---
+
+# Any runtime (Fetch)
+
+`createAgentAuthHandler()` takes a standard `Request` and returns who sent it, so it runs
+anywhere the Fetch API does: Cloudflare Workers, Hono, Bun, Deno, Remix, SvelteKit, Astro.
+
+```ts
+import { createAgentAuthHandler } from '@agentronics/sdk/server'
+
+const agentAuth = createAgentAuthHandler()
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    const out = await agentAuth(request)
+
+    // forward to your origin with the verified identity attached
+    return fetch(new Request(request, { headers: out.headers }))
+  },
+}
+```
+
+`out` contains:
+
+| Field | |
+|---|---|
+| `result` | `verified` / `unverified` / `none` — see [How it works](/docs/concepts/how-it-works) |
+| `headers` | request headers to forward, with `x-agentronics-*` set and forged ones removed |
+
+There's no "blocked" outcome — every request is forwarded. Agentronics authenticates; it
+never turns traffic away.
+
+## Hono
+
+```ts
+import { Hono } from 'hono'
+import { createAgentAuthHandler } from '@agentronics/sdk/server'
+
+const agentAuth = createAgentAuthHandler()
+const app = new Hono()
+
+app.use('*', async (c, next) => {
+  const out = await agentAuth(c.req.raw)
+  c.set('agent', out.result)
+  await next()
+})
+```
+
+## Just the result
+
+To authenticate without the handler wrapper — say, inside an existing request pipeline:
+
+```ts
+import { createAgentAuth } from '@agentronics/sdk/server'
+
+const auth = createAgentAuth()
+const result = await auth.authenticate(request)
+// { status: 'verified', agent } | { status: 'unverified', reason } | { status: 'none' }
+```
+
+## Runtime notes
+
+- **Cloudflare Workers / edge**: Web Bot Auth, API keys and OAuth2 work fully. Crawler reverse
+  DNS needs Node, so crawlers stay unverified there — use Web Bot Auth for signed crawlers.
+  On Cloudflare, the client IP comes from `cf-connecting-ip` automatically.
+- **Node ≥ 20 and Bun**: everything works, including crawler reverse DNS.
+- **Deno**: everything except crawler reverse DNS (crawlers stay unverified).
