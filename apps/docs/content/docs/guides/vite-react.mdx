@@ -1,0 +1,120 @@
+---
+title: Vite + React integration
+description: Use the Agentronics SDK in a plain Vite + React 18 app.
+---
+
+# Vite + React integration
+
+The fastest way to try Agentronics. Vite has no SSR boundary, so everything is plain client React.
+
+## 1. Install
+
+```bash
+pnpm add @agentronics/sdk @agentronics/react
+```
+
+## 2. Mount the provider
+
+```tsx
+// src/main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { AgentronicsProvider } from '@agentronics/react'
+import { App } from './App'
+
+const PUBLISHABLE_KEY = import.meta.env.VITE_AGENTRONICS_KEY ?? 'agtx_pk_local_dev_only'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <AgentronicsProvider
+      publishableKey={PUBLISHABLE_KEY}
+      progression={{
+        initial: 'browse',
+        stages: [
+          { name: 'browse', transitions: [{ on: 'cart.add', to: 'checkout' }] },
+          { name: 'checkout' },
+        ],
+      }}
+    >
+      <App />
+    </AgentronicsProvider>
+  </React.StrictMode>
+)
+```
+
+The provider initializes the SDK once and stores it in Context. Re-renders never re-init.
+
+## 3. Use the hooks
+
+```tsx
+import {
+  useAgentronics,
+  useAgentContext,
+  useGovernedTool,
+  useSiteMemory,
+} from '@agentronics/react'
+
+export function App() {
+  const client = useAgentronics()
+  const ctx = useAgentContext()
+  const shipping = useSiteMemory<string>('policies.shipping')
+
+  useGovernedTool({
+    name: 'cart.add',
+    group: 'cart',
+    stage: 'browse',
+    authz: { minTrust: 'declared', allowedClasses: [], decision: 'allow' },
+    execute: async (input) => addToCart(input),
+  })
+
+  return (
+    <main>
+      <h1>{shipping ?? 'Loading shipping policy...'}</h1>
+      <p>Agent: {ctx.identity ? `${ctx.identity.vendor} (${ctx.identity.trust})` : 'none yet'}</p>
+      <button onClick={() => client.detect()}>Detect</button>
+    </main>
+  )
+}
+```
+
+## 4. Bootstrap site memory once
+
+Drop this near the root so site memory is available for the whole tree:
+
+```tsx
+import { useEffect } from 'react'
+import { useAgentronics } from '@agentronics/react'
+
+export function BootstrapSiteMemory() {
+  const client = useAgentronics()
+  useEffect(() => {
+    client.provideSiteMemory({
+      siteMap: { pages: [{ path: '/', name: 'Home' }] },
+      policies: { shipping: 'Free over $50' },
+    })
+    client.installMemoryDelivery({ metaTags: true })
+  }, [client])
+  return null
+}
+```
+
+`installMemoryDelivery` writes `<meta name="agent-context-*">` tags so DOM agents can read your site memory without a WebMCP runtime.
+
+## 5. Hook reference
+
+| Hook | What it returns | When it re-renders |
+|---|---|---|
+| `useAgentronics()` | The SDK client (escape hatch). | Never (stable reference). |
+| `useAgentContext()` | `{ identity, source, updatedAt }`. | On detect / declare / authenticate / clear. |
+| `useSiteMemory()` | Full SiteMemory snapshot (or dot-path slice). | Whenever the site memory store mutates. |
+| `useGovernedTool()` | `void`. Side-effect hook. | Re-registers when `deps` change. |
+
+## 6. Bundle impact
+
+`@agentronics/react` is < 1 KB gzip on top of the core SDK. The full SDK is < 25 KB; the lite entry (`@agentronics/sdk/lite`) is < 1 KB if you only need detection + WebMCP.
+
+## 7. Where to next
+
+- [Concepts → Tool management](/docs/concepts/tool-management) for surfacing, groups, progression, token budget.
+- [Concepts → Site memory](/docs/concepts/site-memory) for the four delivery channels.
+- [Guides → Memory cookbook](/docs/guides/memory-cookbook) for vertical-specific snapshots.

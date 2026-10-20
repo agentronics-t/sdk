@@ -1,0 +1,151 @@
+---
+title: Next.js integration
+description: Mount the Agentronics SDK once in a Next.js App Router project.
+---
+
+# Next.js integration
+
+`@agentronics/react` is a thin wrapper around `@agentronics/sdk`. It exposes the client through Context, plus four hooks. This guide walks through wiring it into a Next.js App Router project.
+
+## 1. Install
+
+```bash
+pnpm add @agentronics/sdk @agentronics/react
+```
+
+## 2. Mount the provider
+
+The provider must run on the client. Create `app/agentronics-provider.tsx`:
+
+```tsx
+'use client'
+import { type ReactNode } from 'react'
+import { AgentronicsProvider } from '@agentronics/react'
+
+export function AgentronicsProviderRoot({ children }: { children: ReactNode }) {
+  return (
+    <AgentronicsProvider
+      publishableKey={process.env.NEXT_PUBLIC_AGENTRONICS_KEY!}
+      siteId="my-site"
+      progression={{
+        initial: 'browse',
+        stages: [
+          { name: 'browse', transitions: [{ on: 'cart.add', to: 'checkout' }] },
+          { name: 'checkout' },
+        ],
+      }}
+    >
+      {children}
+    </AgentronicsProvider>
+  )
+}
+```
+
+Then wrap the root layout:
+
+```tsx
+// app/layout.tsx
+import { AgentronicsProviderRoot } from './agentronics-provider'
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <AgentronicsProviderRoot>{children}</AgentronicsProviderRoot>
+      </body>
+    </html>
+  )
+}
+```
+
+The SDK initializes once on first mount and persists across route changes.
+
+## 3. Provide site memory
+
+Site memory is enterprise-authored context every agent class can read. Provide it once in a `'use client'` boundary near the root:
+
+```tsx
+'use client'
+import { useEffect } from 'react'
+import { useAgentronics } from '@agentronics/react'
+
+export function SiteMemoryBoot() {
+  const client = useAgentronics()
+  useEffect(() => {
+    client.provideSiteMemory({
+      siteMap: {
+        pages: [
+          { path: '/', name: 'Home' },
+          { path: '/cart', name: 'Cart' },
+          { path: '/checkout', name: 'Checkout' },
+        ],
+      },
+      policies: { shipping: 'Free over $50' },
+    })
+  }, [client])
+  return null
+}
+```
+
+## 4. Register governed tools
+
+Tools registered with `useGovernedTool` automatically register on mount and unregister on unmount.
+
+```tsx
+'use client'
+import { useGovernedTool } from '@agentronics/react'
+
+export function CartToolboxClient({ cartId }: { cartId: string }) {
+  useGovernedTool(
+    {
+      name: 'cart.add',
+      group: 'cart',
+      stage: 'browse',
+      description: 'Add an item to the cart.',
+      authz: { minTrust: 'declared', allowedClasses: [], decision: 'allow' },
+      execute: async (input) => addItem(cartId, input),
+    },
+    [cartId]
+  )
+  return null
+}
+```
+
+## 5. React to identity changes
+
+`useAgentContext` reads the current identity reactively — it re-renders when the SDK detects an agent, when a token is presented, or when `clearIdentity()` is called.
+
+```tsx
+'use client'
+import { useAgentContext, useAgentronics } from '@agentronics/react'
+
+export function AgentBadge() {
+  const ctx = useAgentContext()
+  const client = useAgentronics()
+
+  if (!ctx.identity) {
+    return <button onClick={() => client.detect()}>Detect agent</button>
+  }
+  return <span>{ctx.identity.vendor} ({ctx.identity.trust})</span>
+}
+```
+
+## 6. Read site memory reactively
+
+`useSiteMemory()` returns the live snapshot. Pass a dot-path to subscribe to a slice.
+
+```tsx
+'use client'
+import { useSiteMemory } from '@agentronics/react'
+
+export function ShippingNotice() {
+  const policy = useSiteMemory<string>('policies.shipping')
+  return policy ? <p>Shipping: {policy}</p> : null
+}
+```
+
+## 7. Server-side considerations
+
+`@agentronics/react` is client-only. Don't import its hooks from server components. The provider lives in a `'use client'` file and the SDK initializes on the browser — there is no Next.js-specific server runtime needed.
+
+For static analytics on traces, fetch them from the Agentronics gateway, not from the client SDK.
