@@ -1,4 +1,4 @@
 {
   "title": "Reference",
-  "pages": ["server-api", "configuration", "error-codes", "changelog"]
+  "pages": ["configuration", "error-codes", "changelog"]
 }

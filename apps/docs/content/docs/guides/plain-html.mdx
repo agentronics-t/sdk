@@ -1,0 +1,121 @@
+---
+title: Plain HTML / CDN
+description: Drop the Agentronics SDK into a static page with one script tag — no bundler required.
+---
+
+# Plain HTML / CDN
+
+Agentronics ships an IIFE bundle alongside the ESM and CJS builds. Static sites, server-rendered HTML, and prototypes can pull it from the CDN without a build step.
+
+## One-tag install
+
+```html
+<script type="module">
+  import { Agentronics } from 'https://cdn.agentronics.dev/sdk/0.1.0/index.js'
+
+  const client = Agentronics.init({
+    publishableKey: 'agtx_pk_live_…',
+    siteId: 'shop-acme-com',
+  })
+
+  client.installDomEnforcer()
+  client.installMemoryDelivery({ metaTags: true })
+</script>
+```
+
+The CDN serves the same artifact as `npm install @agentronics/sdk`. Pin a version (`0.1.0`) in production — `latest` is fine for prototypes but will follow major bumps.
+
+## Lite path for WebMCP-only sites
+
+If you only need WebMCP-native detection and the smallest possible footprint (≤ 8 KB brotli):
+
+```html
+<script type="module">
+  import { init, detectWebMcp } from 'https://cdn.agentronics.dev/sdk/0.1.0/lite.js'
+
+  const client = init({
+    publishableKey: 'agtx_pk_live_…',
+    siteId: 'shop-acme-com',
+  })
+
+  const agent = await detectWebMcp()
+  if (agent) console.log('webmcp agent detected:', agent)
+</script>
+```
+
+The lite entry intentionally omits the policy engine, DOM enforcer, site memory, and tracer. Use it when the only thing you need is "is a WebMCP agent on the page right now?".
+
+## Classic `<script>` (no module)
+
+If your CMS or hosting environment can't serve modules:
+
+```html
+<script src="https://cdn.agentronics.dev/sdk/0.1.0/index.iife.js"></script>
+<script>
+  const client = window.Agentronics.init({
+    publishableKey: 'agtx_pk_live_…',
+    siteId: 'shop-acme-com',
+  })
+  client.installDomEnforcer()
+</script>
+```
+
+The IIFE bundle exports `window.Agentronics` with the same API surface as the ESM build.
+
+## Registering tools without a build
+
+```html
+<script type="module">
+  import { Agentronics } from 'https://cdn.agentronics.dev/sdk/0.1.0/index.js'
+
+  const client = Agentronics.init({
+    publishableKey: 'agtx_pk_live_…',
+    siteId: 'shop-acme-com',
+  })
+
+  client.registerTool({
+    name: 'newsletter.subscribe',
+    description: 'Subscribe an email address to the newsletter.',
+    inputSchema: {
+      type: 'object',
+      properties: { email: { type: 'string', format: 'email' } },
+      required: ['email'],
+    },
+    authz: { policy: 'newsletter.write' },
+    async execute({ email }) {
+      await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      return { content: [{ type: 'text', text: 'subscribed' }] }
+    },
+  })
+
+  client.publishToWebMcp()
+</script>
+```
+
+## Subresource Integrity
+
+For locked-down deployments, fetch the SRI hash from `https://cdn.agentronics.dev/sdk/0.1.0/index.js.integrity` and pin it:
+
+```html
+<script
+  type="module"
+  src="https://cdn.agentronics.dev/sdk/0.1.0/index.js"
+  integrity="sha384-…"
+  crossorigin="anonymous"
+></script>
+```
+
+## What you give up vs. the npm install
+
+| Feature | npm install | CDN |
+|---|---|---|
+| Tree-shaking | ✅ — bundler drops unused exports | ⚠️ — full bundle ships |
+| Source maps | ✅ — local files | ✅ — `.map` served alongside |
+| Type checking | ✅ — `.d.ts` files | ❌ — runtime types only |
+| Offline development | ✅ | ❌ |
+
+The runtime behavior is identical. If you start with the CDN and outgrow it, switching to `npm install @agentronics/sdk` is a one-line change.

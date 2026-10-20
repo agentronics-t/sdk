@@ -22,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata = {
   title: 'Agentronics Docs',
-  description: 'Authentication for AI agents — verify every agent on your site with any method.',
+  description: 'Universal governance layer for agent-surfable websites.',
   icons: {
     icon: '/docs-static/icon.svg',
     shortcut: '/docs-static/icon.svg',
