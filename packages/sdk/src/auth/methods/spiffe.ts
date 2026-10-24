@@ -15,7 +15,8 @@ export const spiffe = (): AuthMethod => ({
     const isGoogleFlavor = verified?.vendor === 'google'
     return {
       class: input.classHint ?? 'webmcp',
-      trust: verified?.trust ?? 'verified',
+      // Nothing checked the token → only a claim. A verifier (auth.verifyToken) decides the real trust.
+      trust: verified?.trust ?? 'declared',
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'spiffe',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,

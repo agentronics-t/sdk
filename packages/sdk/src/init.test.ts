@@ -98,7 +98,7 @@ describe('init', () => {
   it('exposes the auth engine through the client', async () => {
     const client = init({ publishableKey: 'agtx_pk_demo_1234567890' })
     const identity = await client.authenticate({ bearerToken: 'bearer_abcdef12' })
-    expect(identity?.trust).toBe('verified')
+    expect(identity?.trust).toBe('declared')
     expect(client.auth.methods()).toContain('bearer')
   })
 

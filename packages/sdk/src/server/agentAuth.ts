@@ -8,15 +8,19 @@
  * routes can read; an unverified agent (or a human) browses exactly as before.
  *
  * Methods, strongest first: Web Bot Auth (RFC 9421 signed agents), agent API
- * keys, OAuth2 client-credentials JWTs, and verified crawlers (forward-confirmed
+ * keys, OAuth 2.1 access tokens (app-only or acting for a user, optionally
+ * DPoP-bound), and verified crawlers (published IP ranges or forward-confirmed
  * reverse DNS). Everything runs on Node ≥ 20 and edge runtimes except crawler
  * rDNS, which needs Node DNS (it degrades to "unverified", never "verified").
  */
 import type { TraceEvent } from '@agentronics/protocol'
-import type * as Jose from 'jose'
 import { classifyUserAgent, clientIp, verifyCrawler, type ClientIpSource, type DnsResolver } from './crawlers.js'
+import type { IpRangeOptions } from './ipRanges.js'
+import { unverifiedIssuer, verifyOAuthToken, type OAuth2Options } from './oauth.js'
 import { bytesToBase64Url } from './structuredFields.js'
-import { memoryReplayCache, verifyWebBotAuth, type WebBotAuthOptions } from './webBotAuth.js'
+import { memoryReplayCache, verifyWebBotAuth, type ReplayCache, type WebBotAuthOptions } from './webBotAuth.js'
+
+export type { OAuth2Options } from './oauth.js'
 
 export type AgentAuthMethod = 'web-bot-auth' | 'api-key' | 'oauth2' | 'verified-crawler'
 
@@ -27,6 +31,8 @@ export interface VerifiedAgent {
   vendor: string | null
   method: AgentAuthMethod
   claims?: Record<string, unknown>
+  /** OAuth delegated tokens: the user this agent is acting for. */
+  onBehalfOf?: { sub: string; email?: string; name?: string }
 }
 
 export type AgentAuthResult =
@@ -48,19 +54,7 @@ export interface ApiKeyOptions {
   verify: (key: string) => ApiKeyIdentity | null | Promise<ApiKeyIdentity | null>
 }
 
-export interface OAuth2Options {
-  issuer: string
-  audience: string | string[]
-  /** Default `<issuer>/.well-known/jwks.json`. */
-  jwksUri?: string
-  /** Static JWKS (tests / pinned keys) instead of fetching `jwksUri`. */
-  jwks?: { keys: JsonWebKey[] }
-  requiredScopes?: string[]
-  algorithms?: string[]
-  clockToleranceSec?: number
-}
-
-export interface CrawlerOptions {
+export interface CrawlerOptions extends IpRangeOptions {
   /** Where to read the client IP. Default 'auto' (platform headers only). */
   clientIp?: ClientIpSource
   /** Test seam / custom resolver. */
@@ -71,7 +65,10 @@ export interface AgentAuthOptions {
   /** Web Bot Auth (on by default). `false` disables it. */
   webBotAuth?: boolean | WebBotAuthOptions
   apiKey?: ApiKeyOptions
-  oauth2?: OAuth2Options
+  /** One issuer, or several (e.g. your own auth server plus a partner's). */
+  oauth2?: OAuth2Options | OAuth2Options[]
+  /** Shared replay cache for Web Bot Auth nonces and DPoP proof ids. Default in-memory. */
+  replayCache?: ReplayCache
   /** Verified crawlers (on by default). `false` disables it. */
   crawlers?: boolean | CrawlerOptions
 }
@@ -84,71 +81,20 @@ const KNOWN_SIGNERS: Record<string, { name: string; vendor: string }> = {
 const GENERIC_AGENT_UA = /\b(bot|crawler|spider|agent|headless|scraper)\b/i
 const JWT_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/
 
-function bearer(request: Request): string | null {
+/** The credential in `Authorization: Bearer|DPoP <token>`, with its scheme. */
+function credential(request: Request): { token: string; scheme: 'bearer' | 'dpop' } | null {
   const h = request.headers.get('authorization')
-  return h && /^bearer\s+/i.test(h) ? h.replace(/^bearer\s+/i, '').trim() : null
-}
-
-function unverifiedJwtIssuer(token: string): string | null {
-  try {
-    const payload = token.split('.')[1]!
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
-    const iss = (JSON.parse(json) as { iss?: unknown }).iss
-    return typeof iss === 'string' ? iss : null
-  } catch {
-    return null
-  }
-}
-
-type JoseModule = typeof Jose
-let josePromise: Promise<JoseModule> | undefined
-const remoteSets = new Map<string, ReturnType<JoseModule['createRemoteJWKSet']>>()
-
-async function verifyOAuth2(token: string, o: OAuth2Options): Promise<VerifiedAgent | { error: string }> {
-  josePromise ??= import('jose')
-  const jose = await josePromise
-  const keySet = o.jwks
-    ? jose.createLocalJWKSet(o.jwks as Parameters<JoseModule['createLocalJWKSet']>[0])
-    : (() => {
-        const uri = o.jwksUri ?? `${o.issuer.replace(/\/$/, '')}/.well-known/jwks.json`
-        let s = remoteSets.get(uri)
-        if (!s) {
-          s = jose.createRemoteJWKSet(new URL(uri), { cacheMaxAge: 3_600_000, cooldownDuration: 30_000 })
-          remoteSets.set(uri, s)
-        }
-        return s
-      })()
-  try {
-    const { payload } = await jose.jwtVerify(token, keySet, {
-      issuer: o.issuer,
-      audience: o.audience,
-      algorithms: o.algorithms ?? ['RS256', 'PS256', 'ES256', 'EdDSA'],
-      clockTolerance: o.clockToleranceSec ?? 30,
-    })
-    if (o.requiredScopes?.length) {
-      const granted = new Set(String(payload.scope ?? payload.scp ?? '').split(/\s+/))
-      const missing = o.requiredScopes.filter((s) => !granted.has(s))
-      if (missing.length) return { error: `missing_scopes:${missing.join(',')}` }
-    }
-    const clientId = String(payload.client_id ?? payload.azp ?? payload.sub ?? '')
-    if (!clientId) return { error: 'token_has_no_client_id' }
-    return {
-      id: `oauth2:${clientId}`,
-      name: typeof payload.agent_name === 'string' ? payload.agent_name : clientId,
-      vendor: typeof payload.agent_vendor === 'string' ? payload.agent_vendor : null,
-      method: 'oauth2',
-      claims: { sub: payload.sub, scope: payload.scope ?? payload.scp },
-    }
-  } catch (e) {
-    return { error: `invalid_token:${(e as { code?: string }).code ?? (e as Error).message}` }
-  }
+  const m = h?.match(/^(bearer|dpop)\s+(.+)$/i)
+  return m ? { token: m[2]!.trim(), scheme: m[1]!.toLowerCase() as 'bearer' | 'dpop' } : null
 }
 
 export function createAgentAuth(options: AgentAuthOptions = {}) {
+  const replayCache = options.replayCache ?? memoryReplayCache()
   const wba: WebBotAuthOptions | null =
     options.webBotAuth === false
       ? null
-      : { replayCache: memoryReplayCache(), ...(typeof options.webBotAuth === 'object' ? options.webBotAuth : {}) }
+      : { replayCache, ...(typeof options.webBotAuth === 'object' ? options.webBotAuth : {}) }
+  const issuers = options.oauth2 ? (Array.isArray(options.oauth2) ? options.oauth2 : [options.oauth2]) : []
   const crawlers: CrawlerOptions | null =
     options.crawlers === false ? null : typeof options.crawlers === 'object' ? options.crawlers : {}
   const keyPrefix = options.apiKey?.prefix ?? 'agk_'
@@ -182,8 +128,9 @@ export function createAgentAuth(options: AgentAuthOptions = {}) {
       }
     }
 
-    // 2/3. Bearer credentials — agent API key or OAuth2 JWT
-    const token = bearer(request) ?? request.headers.get('x-agent-key')
+    // 2/3. Credentials — agent API key or OAuth 2.1 access token
+    const cred = credential(request)
+    const token = cred?.token ?? request.headers.get('x-agent-key')
     if (token && options.apiKey && token.startsWith(keyPrefix)) {
       attempted.push('api-key')
       const id = await options.apiKey.verify(token)
@@ -200,14 +147,25 @@ export function createAgentAuth(options: AgentAuthOptions = {}) {
         }
       }
       reasons.push('api-key:unknown_or_revoked')
-    } else if (token && options.oauth2 && JWT_SHAPE.test(token)) {
-      // Only tokens from *our* issuer are agent credentials — a user's
+    } else if (cred && issuers.length && JWT_SHAPE.test(cred.token)) {
+      // Only tokens from a configured issuer are agent credentials — a user's
       // session JWT from another issuer is not agent traffic.
-      const iss = unverifiedJwtIssuer(token)
-      if (iss === options.oauth2.issuer) {
+      const iss = unverifiedIssuer(cred.token)
+      const config = issuers.find((i) => i.issuer === iss)
+      if (config) {
         attempted.push('oauth2')
-        const r = await verifyOAuth2(token, options.oauth2)
-        if (!('error' in r)) return { status: 'verified', agent: r }
+        const r = await verifyOAuthToken(cred.token, config, { request, scheme: cred.scheme, replayCache })
+        if (!('error' in r)) {
+          const agent: VerifiedAgent = {
+            id: r.id,
+            name: r.name,
+            vendor: r.vendor,
+            method: 'oauth2',
+            claims: { ...r.claims, dpop: r.dpop },
+          }
+          if (r.onBehalfOf) agent.onBehalfOf = r.onBehalfOf
+          return { status: 'verified', agent }
+        }
         reasons.push(`oauth2:${r.error}`)
       }
     }
@@ -219,11 +177,11 @@ export function createAgentAuth(options: AgentAuthOptions = {}) {
       claimedName ??= claim.name
       if (crawlers) {
         attempted.push('verified-crawler')
-        const v = await verifyCrawler(claim, clientIp(request, crawlers.clientIp), crawlers.resolver)
+        const v = await verifyCrawler(claim, clientIp(request, crawlers.clientIp), crawlers.resolver, crawlers)
         if (v.status === 'verified') {
           return {
             status: 'verified',
-            agent: { id: `crawler:${claim.name}`, name: claim.name, vendor: null, method: 'verified-crawler', claims: { host: v.host } },
+            agent: { id: `crawler:${claim.name}`, name: claim.name, vendor: null, method: 'verified-crawler', claims: { host: v.host, via: v.via } },
           }
         }
         reasons.push(`crawler:${v.reason}`)
@@ -316,6 +274,7 @@ export function toTraceEvent(result: AgentAuthResult, ctx: { siteId: string; req
   if (result.status === 'none') return null
   const url = new URL(ctx.request.url)
   const verified = result.status === 'verified'
+  const delegated = verified && Boolean(result.agent.onBehalfOf)
   return {
     id: `evt_${crypto.randomUUID()}`,
     siteId: ctx.siteId,
@@ -324,12 +283,13 @@ export function toTraceEvent(result: AgentAuthResult, ctx: { siteId: string; req
     type: 'auth.identity_presented',
     agent: {
       class: 'crawler',
-      trust: verified ? 'verified' : 'declared',
+      // Unverified claims stay "declared"; a token acting for a signed-in user is "linked".
+      trust: delegated ? 'linked' : verified ? 'verified' : 'declared',
       confidence: verified ? 1 : 0.5,
       vendor: verified ? (result.agent.vendor ?? result.agent.name) : (result.claimedName ?? null),
       userAgent: ctx.request.headers.get('user-agent'),
       detectionVersion: '2026.09',
-      signals: { surface: 'server' },
+      signals: { surface: 'server', ...(verified ? { method: result.agent.method } : {}) },
     },
     outcome: verified ? 'success' : 'error',
     ...(verified ? {} : { error: result.reason }),

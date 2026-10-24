@@ -2,13 +2,19 @@
  * Server-side crawler identification + verification.
  *
  * A User-Agent claim is trivially spoofable, so on its own it only makes a
- * request "claimed". A claim becomes verified by forward-confirmed reverse DNS
- * (the IP's PTR name sits under the vendor's documented domain AND resolves
- * back to the same IP) — the method Google, Microsoft, Apple, Yandex, Baidu and
- * Amazon document for their crawlers. Needs Node DNS; on edge runtimes the
- * claim stays unverified (use Web Bot Auth, which works everywhere).
+ * request "claimed". A claim becomes verified in one of two ways the vendor
+ * documents:
+ *
+ * 1. **Published IP ranges** — the client IP is inside the CIDR list the vendor
+ *    publishes as JSON (OpenAI, Perplexity, Google, Bing, DuckDuckGo, Common
+ *    Crawl). Needs only `fetch`, so it works on edge runtimes too.
+ * 2. **Forward-confirmed reverse DNS** — the IP's PTR name sits under the
+ *    vendor's domain AND resolves back to the same IP (Google, Microsoft,
+ *    Apple, Yandex, Baidu, Amazon). Needs Node DNS; on edge runtimes it
+ *    degrades to "unverified".
  */
 import { CRAWLER_SIGNATURES, type CrawlerSignature } from '../detection/crawler.js'
+import { ipInRanges, rangesFor, type IpRangeOptions } from './ipRanges.js'
 
 /** Vendors that document reverse-DNS verification, keyed by signature name. */
 export const RDNS_DOMAINS: Record<string, string[]> = {
@@ -74,23 +80,30 @@ const rdnsCache = new Map<string, { ok: boolean; host?: string; until: number }>
 export const __clearRdnsCache = () => rdnsCache.clear()
 
 export type CrawlerVerification =
-  | { status: 'verified'; name: string; host: string; ip: string }
+  | { status: 'verified'; name: string; host: string; ip: string; via: 'ip-range' | 'rdns' }
   | { status: 'unverified'; name: string; reason: string }
 
 export async function verifyCrawler(
   claim: CrawlerClaim,
   ip: string | null,
-  resolver?: DnsResolver
+  resolver?: DnsResolver,
+  ranges: IpRangeOptions = {}
 ): Promise<CrawlerVerification> {
   const domains = RDNS_DOMAINS[claim.name]
-  if (!domains) return { status: 'unverified', name: claim.name, reason: 'no_rdns_method_for_vendor' }
+  const cidrs = await rangesFor(claim.name, ranges)
+  if (!domains && !cidrs) return { status: 'unverified', name: claim.name, reason: 'no_verification_method_for_vendor' }
   if (!ip) return { status: 'unverified', name: claim.name, reason: 'client_ip_unknown' }
+
+  if (cidrs?.length && ipInRanges(ip, cidrs)) {
+    return { status: 'verified', name: claim.name, host: ip, ip, via: 'ip-range' }
+  }
+  if (!domains) return { status: 'unverified', name: claim.name, reason: 'ip_outside_published_ranges' }
 
   const key = `${claim.name}|${ip}`
   const hit = rdnsCache.get(key)
   if (hit && hit.until > Date.now()) {
     return hit.ok
-      ? { status: 'verified', name: claim.name, host: hit.host!, ip }
+      ? { status: 'verified', name: claim.name, host: hit.host!, ip, via: 'rdns' }
       : { status: 'unverified', name: claim.name, reason: 'rdns_mismatch' }
   }
 
@@ -109,7 +122,7 @@ export async function verifyCrawler(
       const forward = await dns.lookup(host)
       if (forward.includes(ip)) {
         remember(true, host)
-        return { status: 'verified', name: claim.name, host, ip }
+        return { status: 'verified', name: claim.name, host, ip, via: 'rdns' }
       }
     }
     remember(false)

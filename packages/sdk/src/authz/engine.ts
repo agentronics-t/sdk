@@ -27,7 +27,8 @@ const meetsClass = (identity: AgentIdentity | null, rule: PolicyRuleType): boole
   return rule.allowedClasses.includes(identity.class)
 }
 
-const DEFAULT_DECISION: PolicyDecision = 'review'
+// No matching rule means the site hasn't restricted the tool: it stays callable.
+const DEFAULT_DECISION: PolicyDecision = 'allow'
 
 export interface EvaluateInput {
   tool: string

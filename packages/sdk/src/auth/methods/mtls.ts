@@ -15,7 +15,8 @@ export const mtls = (): AuthMethod => ({
     const verified = await context.verifyToken?.('mtls', input.xfccHeader)
     return {
       class: input.classHint ?? 'webmcp',
-      trust: verified?.trust ?? 'verified',
+      // Nothing checked the token → only a claim. A verifier (auth.verifyToken) decides the real trust.
+      trust: verified?.trust ?? 'declared',
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'mtls',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,

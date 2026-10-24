@@ -1,10 +1,11 @@
 import type { ToolDescriptor } from '@agentronics/protocol'
 import type { GovernedTool } from './registry.js'
+import { descriptorTokens } from './tokenEstimate.js'
 
 /**
  * Map a registered tool to the wire descriptor the gateway/dashboard consume.
- * `tokens` uses the same rough OpenAI-style rule of thumb the SDK's token
- * budget uses (≈ characters / 4) so the dashboard's per-tool cost matches.
+ * `tokens` is the SDK's estimate (≈ characters / 4) of the model-facing
+ * descriptor, so the console's per-tool cost matches `estimateTokens()`.
  */
 export const toToolDescriptor = (tool: GovernedTool): ToolDescriptor => {
   const descriptor: ToolDescriptor = {
@@ -13,17 +14,13 @@ export const toToolDescriptor = (tool: GovernedTool): ToolDescriptor => {
     inputSchema: tool.inputSchema ?? {},
     tokens: 0,
   }
+  if (tool.title) descriptor.title = tool.title
+  if (tool.annotations) descriptor.annotations = { ...tool.annotations } as Record<string, boolean>
   if (tool.group) descriptor.group = tool.group
   if (tool.stage) descriptor.page = tool.stage
   if (tool.outputSchema) descriptor.outputSchema = tool.outputSchema
-  descriptor.tokens = Math.ceil(
-    JSON.stringify({
-      name: descriptor.name,
-      description: descriptor.description,
-      inputSchema: descriptor.inputSchema,
-      ...(descriptor.outputSchema ? { outputSchema: descriptor.outputSchema } : {}),
-    }).length / 4
-  )
+  // Same count the browser reports: what agents receive (output schemas aren't sent).
+  descriptor.tokens = descriptorTokens(tool)
   return descriptor
 }
 

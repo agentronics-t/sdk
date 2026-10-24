@@ -65,6 +65,11 @@ export interface AuthEngineOptions {
   onTrace?: (input: TraceInput) => void
 }
 
+/**
+ * Methods on by default. SSO, SPIFFE (incl. Google Agent Identity) and mTLS are
+ * kept but off until they ship — pass `methods: [...defaultAuthMethods(),
+ * ...previewAuthMethods()]` to try them.
+ */
 export const defaultAuthMethods = (): AuthMethod[] => [
   detectionAsAuth(),
   selfDeclaration(),
@@ -73,10 +78,10 @@ export const defaultAuthMethods = (): AuthMethod[] => [
   extensionToken(),
   sessionLink(),
   oauth2(),
-  sso(),
-  spiffe(),
-  mtls(),
 ]
+
+/** Coming later: enterprise agent SSO, workload identity (SPIFFE) and mTLS. */
+export const previewAuthMethods = (): AuthMethod[] => [sso(), spiffe(), mtls()]
 
 // Method-name → dashboard-facing AuthProtocol label. The spiffe method
 // can override its emitted label to 'google-agent' by setting

@@ -59,7 +59,7 @@ describe('agent API keys', () => {
   })
 })
 
-describe('OAuth2 client-credentials JWTs', () => {
+describe('OAuth 2.1 access tokens', () => {
   const ISS = 'https://auth.acme.example'
   async function setup() {
     const { publicKey, privateKey } = await generateKeyPair('RS256')
@@ -98,7 +98,94 @@ describe('OAuth2 client-credentials JWTs', () => {
     const userJwt = await new SignJWT({ sub: 'user_1' }).setProtectedHeader({ alg: 'RS256' }).setIssuer('https://clerk.shop.example').sign(privateKey)
     expect(await auth.authenticate(req({ authorization: `Bearer ${userJwt}` }))).toEqual({ status: 'none' })
   })
+
+  it('a delegated token names the user the agent acts for, and traces as linked', async () => {
+    const { auth, token } = await setup()
+    const t = await token({ client_id: 'shopping-agent', sub: 'user_42', email: 'sam@example.com', scope: 'agent:browse' })
+    const r = await auth.authenticate(req({ authorization: `Bearer ${t}` }))
+    expect(r).toMatchObject({ status: 'verified', agent: { id: 'oauth2:shopping-agent', onBehalfOf: { sub: 'user_42', email: 'sam@example.com' } } })
+    expect(toTraceEvent(r, { siteId: 's', request: req() })?.agent?.trust).toBe('linked')
+  })
+
+  it('token exchange: the act claim is the agent, sub is the user', async () => {
+    const { auth, token } = await setup()
+    const t = await token({ sub: 'user_7', act: { sub: 'agent-runtime-9' }, scope: 'agent:browse' })
+    expect(await auth.authenticate(req({ authorization: `Bearer ${t}` }))).toMatchObject({
+      status: 'verified',
+      agent: { id: 'oauth2:agent-runtime-9', onBehalfOf: { sub: 'user_7' } },
+    })
+  })
+
+  it('accepts several issuers', async () => {
+    const a = await setup()
+    const { publicKey, privateKey } = await generateKeyPair('ES256')
+    const jwk = { ...(await exportJWK(publicKey)), kid: 'p1', alg: 'ES256' }
+    const partner = 'https://idp.partner.example'
+    const auth = createAgentAuth({
+      oauth2: [
+        { issuer: ISS, audience: 'https://shop.example', jwks: { keys: [] } },
+        { issuer: partner, audience: 'https://shop.example', jwks: { keys: [jwk] } },
+      ],
+    })
+    void a
+    const t = await new SignJWT({ client_id: 'partner-agent' }).setProtectedHeader({ alg: 'ES256', kid: 'p1' }).setIssuer(partner).setAudience('https://shop.example').setExpirationTime('5m').sign(privateKey)
+    expect(await auth.authenticate(req({ authorization: `Bearer ${t}` }))).toMatchObject({ status: 'verified', agent: { id: 'oauth2:partner-agent' } })
+  })
 })
+
+describe('DPoP-bound tokens (RFC 9449)', () => {
+  const ISS = 'https://auth.acme.example'
+  const URL_ = 'https://shop.example/api/orders'
+  async function setup() {
+    const as = await generateKeyPair('RS256')
+    const jwk = { ...(await exportJWK(as.publicKey)), kid: 'k1', alg: 'RS256' }
+    const agentKey = await generateKeyPair('ES256')
+    const agentJwk = await exportJWK(agentKey.publicKey)
+    const { calculateJwkThumbprint } = await import('jose')
+    const jkt = await calculateJwkThumbprint(agentJwk, 'sha256')
+    const accessToken = await new SignJWT({ client_id: 'bound-agent', cnf: { jkt } })
+      .setProtectedHeader({ alg: 'RS256', kid: 'k1' }).setIssuer(ISS).setAudience('https://shop.example').setExpirationTime('5m').sign(as.privateKey)
+    const ath = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(accessToken))).toString('base64url')
+    const proof = (claims: Record<string, unknown> = {}) =>
+      new SignJWT({ htm: 'POST', htu: URL_, ath, jti: crypto.randomUUID(), ...claims })
+        .setProtectedHeader({ alg: 'ES256', typ: 'dpop+jwt', jwk: agentJwk }).setIssuedAt().sign(agentKey.privateKey)
+    const auth = createAgentAuth({ oauth2: { issuer: ISS, audience: 'https://shop.example', jwks: { keys: [jwk] } } })
+    const post = (headers: Record<string, string>) => new Request(URL_, { method: 'POST', headers: { 'user-agent': HUMAN_UA, ...headers } })
+    return { auth, accessToken, proof, post }
+  }
+
+  it('verifies a bound token with a valid proof', async () => {
+    const { auth, accessToken, proof, post } = await setup()
+    const r = await auth.authenticate(post({ authorization: `DPoP ${accessToken}`, dpop: await proof() }))
+    expect(r).toMatchObject({ status: 'verified', agent: { id: 'oauth2:bound-agent', claims: { dpop: true } } })
+  })
+
+  it('refuses a bound token sent as a plain bearer token, a replayed proof, and a proof for another URL', async () => {
+    const { auth, accessToken, proof, post } = await setup()
+    expect(await auth.authenticate(post({ authorization: `Bearer ${accessToken}` }))).toMatchObject({ reason: 'oauth2:dpop_proof_required' })
+    const p = await proof()
+    await auth.authenticate(post({ authorization: `DPoP ${accessToken}`, dpop: p }))
+    expect(await auth.authenticate(post({ authorization: `DPoP ${accessToken}`, dpop: p }))).toMatchObject({ reason: 'oauth2:dpop_replayed' })
+    const other = await proof({ htu: 'https://shop.example/api/admin' })
+    expect(await auth.authenticate(post({ authorization: `DPoP ${accessToken}`, dpop: other }))).toMatchObject({ reason: 'oauth2:dpop_htu_mismatch' })
+  })
+})
+
+describe('protected-resource metadata (RFC 9728)', () => {
+  it('describes the resource and builds the WWW-Authenticate challenge', async () => {
+    const { protectedResourceMetadata, oauthChallenge } = await import('./oauth.js')
+    expect(protectedResourceMetadata({ resource: 'https://shop.example', authorizationServers: ['https://auth.acme.example'], scopesSupported: ['agent:browse'] })).toMatchObject({
+      resource: 'https://shop.example',
+      authorization_servers: ['https://auth.acme.example'],
+      scopes_supported: ['agent:browse'],
+    })
+    expect(oauthChallenge('https://shop.example/', { scope: 'agent:buy' })).toBe(
+      'Bearer resource_metadata="https://shop.example/.well-known/oauth-protected-resource", scope="agent:buy"'
+    )
+  })
+})
+
+const NO_RANGES = { Googlebot: [] as string[] }
 
 describe('verified crawlers (forward-confirmed reverse DNS)', () => {
   const GOOGLEBOT = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
@@ -108,29 +195,69 @@ describe('verified crawlers (forward-confirmed reverse DNS)', () => {
   })
 
   it('verifies Googlebot when rDNS and forward DNS agree', async () => {
-    const auth = createAgentAuth({ crawlers: { resolver: dns(['crawl-66-249-66-1.googlebot.com'], ['66.249.66.1']) } })
+    const auth = createAgentAuth({ crawlers: { ipRanges: NO_RANGES, resolver: dns(['crawl-66-249-66-1.googlebot.com'], ['66.249.66.1']) } })
     const r = await auth.authenticate(req({ 'user-agent': GOOGLEBOT, 'x-real-ip': '66.249.66.1' }))
     expect(r).toMatchObject({ status: 'verified', agent: { id: 'crawler:Googlebot', method: 'verified-crawler' } })
   })
 
   it('rejects a spoofed UA whose IP is not Google', async () => {
-    const auth = createAgentAuth({ crawlers: { resolver: dns(['host.attacker.example'], ['203.0.113.9']) } })
+    const auth = createAgentAuth({ crawlers: { ipRanges: NO_RANGES, resolver: dns(['host.attacker.example'], ['203.0.113.9']) } })
     const r = await auth.authenticate(req({ 'user-agent': GOOGLEBOT, 'x-real-ip': '203.0.113.9' }))
     expect(r).toMatchObject({ status: 'unverified', reason: 'crawler:rdns_mismatch', claimedName: 'Googlebot' })
   })
 
   it('rejects when the PTR name is right but forward DNS does not confirm', async () => {
-    const auth = createAgentAuth({ crawlers: { resolver: dns(['fake.googlebot.com'], ['66.249.66.2']) } })
+    const auth = createAgentAuth({ crawlers: { ipRanges: NO_RANGES, resolver: dns(['fake.googlebot.com'], ['66.249.66.2']) } })
     const r = await auth.authenticate(req({ 'user-agent': GOOGLEBOT, 'x-real-ip': '66.249.66.1' }))
     expect(r).toMatchObject({ status: 'unverified', reason: 'crawler:rdns_mismatch' })
   })
 
   it('never trusts a client-supplied X-Forwarded-For', async () => {
     const resolver = dns(['crawl-66-249-66-1.googlebot.com'], ['66.249.66.1'])
-    const auth = createAgentAuth({ crawlers: { resolver } })
+    const auth = createAgentAuth({ crawlers: { ipRanges: NO_RANGES, resolver } })
     const r = await auth.authenticate(req({ 'user-agent': GOOGLEBOT, 'x-forwarded-for': '66.249.66.1' }))
     expect(r).toMatchObject({ status: 'unverified', reason: 'crawler:client_ip_unknown' })
     expect(resolver.reverse).not.toHaveBeenCalled()
+  })
+})
+
+describe('verified crawlers (published IP ranges)', () => {
+  const GPTBOT = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.3; +https://openai.com/gptbot'
+  const ranges = { GPTBot: ['132.196.86.0/24', '2a01:111:f400::/48'] }
+
+  it('verifies GPTBot from inside its published ranges, IPv4 and IPv6 — no DNS needed', async () => {
+    const auth = createAgentAuth({ crawlers: { ipRanges: ranges } })
+    const v4 = await auth.authenticate(req({ 'user-agent': GPTBOT, 'cf-connecting-ip': '132.196.86.42' }))
+    expect(v4).toMatchObject({ status: 'verified', agent: { id: 'crawler:GPTBot', claims: { via: 'ip-range' } } })
+    const v6 = await auth.authenticate(req({ 'user-agent': GPTBOT, 'cf-connecting-ip': '2a01:111:f400:1::5' }))
+    expect(v6).toMatchObject({ status: 'verified' })
+  })
+
+  it('rejects a GPTBot claim from outside the ranges', async () => {
+    const auth = createAgentAuth({ crawlers: { ipRanges: ranges } })
+    const r = await auth.authenticate(req({ 'user-agent': GPTBOT, 'cf-connecting-ip': '203.0.113.9' }))
+    expect(r).toMatchObject({ status: 'unverified', reason: 'crawler:ip_outside_published_ranges', claimedName: 'GPTBot' })
+  })
+
+  it('loads and caches a vendor range list', async () => {
+    const { __clearIpRangeCache, rangesFor } = await import('./ipRanges.js')
+    __clearIpRangeCache()
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ prefixes: [{ ipv4Prefix: '1.2.3.0/24' }, { ipv6Prefix: '2001:db8::/32' }] })))
+    expect(await rangesFor('PerplexityBot', { fetcher: fetcher as unknown as typeof fetch })).toEqual(['1.2.3.0/24', '2001:db8::/32'])
+    await rangesFor('PerplexityBot', { fetcher: fetcher as unknown as typeof fetch })
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect(await rangesFor('NoSuchBot')).toBeNull()
+  })
+
+  it('matches CIDRs exactly', async () => {
+    const { ipInCidr } = await import('./ipRanges.js')
+    expect(ipInCidr('10.0.0.255', '10.0.0.0/24')).toBe(true)
+    expect(ipInCidr('10.0.1.0', '10.0.0.0/24')).toBe(false)
+    expect(ipInCidr('::ffff:10.0.0.7', '10.0.0.0/24')).toBe(true)
+    expect(ipInCidr('2001:db8::1', '10.0.0.0/8')).toBe(false)
+    expect(ipInCidr('2001:4860:4801:10::1', '2001:4860:4801:10::/64')).toBe(true)
+    expect(ipInCidr('2001:4860:4801:11::1', '2001:4860:4801:10::/64')).toBe(false)
+    expect(ipInCidr('not-an-ip', '10.0.0.0/8')).toBe(false)
   })
 })
 

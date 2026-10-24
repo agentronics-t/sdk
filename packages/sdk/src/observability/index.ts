@@ -16,4 +16,4 @@ export {
   createDashboardExporter,
   createDashboardSync,
 } from './exporters/intel.js'
-export type { IntelExporterOptions, IntelSync, IntelSyncOptions } from './exporters/intel.js'
+export type { IntelExporterOptions, IntelSync, IntelSyncOptions, DashboardConfig } from './exporters/intel.js'
