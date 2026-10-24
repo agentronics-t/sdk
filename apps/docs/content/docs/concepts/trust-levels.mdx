@@ -1,24 +1,15 @@
 ---
 title: Trust Levels
-description: How Agentronics moves from detection to linked user trust.
+description: How Agentronics moves from detection to a verified agent acting for a known user.
 ---
 
 # Trust Levels
 
-The trust ladder is ordered:
+| Trust | Meaning | Reached by |
+|---|---|---|
+| `detected` | Signals indicate an agent; nothing is proven. | WebMCP activity, vision behaviour, DOM fingerprints, crawler UA |
+| `declared` | The agent named itself, or presented a credential nothing has checked yet. | Self-declaration, X-Agent header, unverified tokens in the browser |
+| `verified` | A credential was checked. | [Web Bot Auth](/docs/auth/web-bot-auth), [OAuth 2.1](/docs/auth/oauth), [agent API keys](/docs/auth/api-keys), [verified crawlers](/docs/auth/verified-crawlers), or your `verifyToken` |
+| `linked` | A verified agent acting for a signed-in user. | A delegated OAuth token, or a verified session link |
 
-| Trust | Meaning |
-|---|---|
-| `detected` | Signals indicate an agent, but no identity proof exists. |
-| `declared` | The agent identified itself. |
-| `verified` | A token or proof was verified. |
-| `linked` | The verified agent is linked to a known user account. |
-
-```ts
-const identity = await client.authenticate({
-  sessionLinkToken: 'ses_...',
-  linkedUserId: 'user_123',
-})
-```
-
-When multiple auth methods produce identities, the SDK keeps the highest-trust result.
+When several methods produce an identity, the SDK keeps the highest-trust one. Use `minTrust` in [authorization rules](/docs/authorization) to decide what each level may call — e.g. `verified` to place orders, `linked` to touch a user's account.

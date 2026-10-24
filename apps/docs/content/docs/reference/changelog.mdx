@@ -7,6 +7,20 @@ description: Release notes for every published Agentronics package.
 
 This page is regenerated from [Changesets](https://github.com/changesets/changesets) on every release. The latest entry sits at the top.
 
+## v0.7.0 — pillars v2 (unreleased)
+
+### `@agentronics/sdk`
+
+- **WebMCP (Oct 2026 draft):** tools register with `document.modelContext.registerTool()` — async, unregistered by `AbortSignal` — with `title`, `annotations` (`readOnlyHint`, `consequentialHint`, `untrustedContentHint`) and `exposedTo`. `publishToWebMcp()` returns each tool's registration status. A WebMCP agent is detected when it activates or calls a tool; the API existing is no longer treated as an agent.
+- **Detection:** vision-model (screenshot) agents, from interaction patterns; more automation-framework markers.
+- **Authentication:** verified crawlers also use vendors' published IP ranges; OAuth 2.1 with several issuers, delegated tokens (`onBehalfOf`, `act`), DPoP, and RFC 9728 metadata helpers. **Breaking:** browser tokens nothing has verified are `declared`, not `verified`. SSO, SPIFFE and mTLS are off by default (`previewAuthMethods()`).
+- **Authorization:** `review` asks the person on the page and never runs the tool without approval; no matching rule now means `allow`.
+- **Console sync:** `pullConfig()`, `keyVerifier()`, `init({ toolDescriptions })`, `setToolDescriptions()`, `createTraceRelay()`.
+
+### `@agentronics/protocol`
+
+- `ToolDescriptor` gains `title` and `annotations`.
+
 ## v0.1.0 — 2026-05-09
 
 The first publishable Agentronics release. Everything documented under [Concepts](/docs/concepts/three-agent-classes) and [Reference](/docs/reference/configuration) is live in this version.

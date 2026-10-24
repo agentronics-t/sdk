@@ -1,0 +1,59 @@
+---
+title: Agent API keys
+description: Issue a key to each agent you or your partners run, and verify it live against the console.
+---
+
+# Agent API keys
+
+The simplest way for an agent you know about — your own, or a partner's — to prove who it is: give it a key. Agents send it as `Authorization: Bearer agk_…` (or `X-Agent-Key: agk_…`).
+
+## 1. Mint keys in the console
+
+**Auth → Agent API keys → Create key.** Name the agent (and optionally its vendor); copy the `agk_…` key — it's shown once. Only its SHA-256 is stored. Your plan sets how many keys can be active (Free 3, Starter 25, Pro unlimited).
+
+## 2. Verify them on your server
+
+**Live (recommended).** Revoking a key in the console takes effect within a minute:
+
+```ts
+import { createDashboardSync } from '@agentronics/sdk'
+import { createAgentAuth } from '@agentronics/sdk/server'
+
+const sync = createDashboardSync({
+  url: process.env.AGENTRONICS_API_URL!,
+  ingestKey: process.env.AGENTRONICS_INGEST_KEY!, // server-only secret
+  siteId: 'shop',
+})
+
+const auth = createAgentAuth({ apiKey: { verify: sync.keyVerifier({ cacheSeconds: 60 }) } })
+// → { status: 'verified', agent: { id: 'key:booking-agent', name: 'Booking agent', vendor: 'Acme', method: 'api-key' } }
+```
+
+If the console can't be reached, the verifier serves its last cached answer, and otherwise treats the key as unknown — the agent is unverified, never blocked.
+
+**Offline.** For servers that can't call out, copy the `AGENT_KEYS` map from the console (hashes only) into an env var:
+
+```ts
+import { staticKeyVerifier } from '@agentronics/sdk/server'
+
+const auth = createAgentAuth({ apiKey: { verify: staticKeyVerifier(JSON.parse(process.env.AGENT_KEYS!)) } })
+```
+
+Changes then take effect on your next deploy.
+
+## Your own key store
+
+`verify` is any function from key to identity:
+
+```ts
+import { generateAgentKey, hashAgentKey } from '@agentronics/sdk/server'
+
+const key = generateAgentKey()              // agk_ + 32 random bytes — show once
+await db.save({ hash: await hashAgentKey(key), agentId: 'booking-agent' })
+
+createAgentAuth({
+  apiKey: { verify: async (key) => db.findByHash(await hashAgentKey(key)) }, // → { agentId, name?, vendor?, scopes? } | null
+})
+```
+
+Use `prefix` to change the `agk_` marker. Only tokens with the prefix are checked as keys; anything else is left for OAuth.

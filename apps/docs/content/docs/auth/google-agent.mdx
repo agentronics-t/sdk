@@ -3,6 +3,10 @@ title: Google Agent Identity
 description: Agents on Google's Agent Identity platform — a SPIFFE flavor with Google-specific vendor enrichment.
 ---
 
+<Callout type="info">
+  **Coming later.** This method is built but off by default and not yet in the console. See [Authentication](/docs/auth/overview#coming-later).
+</Callout>
+
 # Google Agent Identity
 
 > **TL;DR — Google Agent Identity is built on SPIFFE.** Google IAM assigns each agent a SPIFFE ID like `spiffe://<PROJECT_ID>.svc.id.goog/resources/vertex/agent-42` and issues JWT‑SVIDs against it. Our verifier handles these in the [SPIFFE](./spiffe.mdx) method — this page just documents the Google‑specific enrichment.

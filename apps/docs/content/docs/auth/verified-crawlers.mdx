@@ -1,0 +1,46 @@
+---
+title: Verified crawlers
+description: Confirm a crawler's User-Agent claim with the vendor's published IP ranges or reverse DNS.
+---
+
+# Verified crawlers
+
+Anyone can put `GPTBot` in a User-Agent. A crawler is **verified** only when the request also comes from where the vendor says its crawler lives. The SDK uses the method each vendor documents:
+
+| Method | Vendors | Runtime |
+|---|---|---|
+| **Published IP ranges** — the client IP is inside the vendor's JSON list of CIDR blocks | GPTBot, OAI-SearchBot, ChatGPT-User, PerplexityBot, Perplexity-User, Googlebot, Bingbot, DuckDuckBot, CCBot | Anywhere `fetch` works, including the edge |
+| **Forward-confirmed reverse DNS** — the IP's PTR name is under the vendor's domain *and* resolves back to the IP | Googlebot, Bingbot, Applebot, YandexBot, Baiduspider, Amazonbot | Node (needs DNS); on the edge it stays unverified |
+
+Ranges are fetched from the vendors' own URLs (see `PUBLISHED_IP_RANGES`), cached for 24 hours, and a stale list keeps being used if a refresh fails.
+
+## Use it
+
+On by default:
+
+```ts
+import { createAgentAuth } from '@agentronics/sdk/server'
+
+const result = await createAgentAuth().authenticate(request)
+// → { status: 'verified', agent: { id: 'crawler:GPTBot', name: 'GPTBot', method: 'verified-crawler', claims: { via: 'ip-range' } } }
+// A spoofed UA → { status: 'unverified', reason: 'crawler:ip_outside_published_ranges', claimedName: 'GPTBot' }
+```
+
+## The client IP
+
+The client IP is read from headers your platform sets and the caller can't forge: `cf-connecting-ip` (Cloudflare), `x-real-ip` / `x-vercel-forwarded-for` (Vercel). The leftmost `X-Forwarded-For` is never trusted. Elsewhere, tell the SDK:
+
+```ts
+createAgentAuth({
+  crawlers: {
+    clientIp: (req) => req.headers.get('x-my-proxy-client-ip'),
+    ipRanges: { MyBot: ['203.0.113.0/24'] }, // add or pin ranges (replaces the fetched list for that name)
+  },
+})
+```
+
+`crawlers: false` turns crawler verification off.
+
+## In the browser
+
+`detectCrawler()` in the browser SDK only *detects* crawlers that run JavaScript, by User-Agent (`trust: 'detected'`, `confidence: 0.9`). Verification needs the IP, so it lives on the server.

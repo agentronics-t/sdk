@@ -9,10 +9,10 @@ Agentronics models agents by how they interact with the page. Each class comes w
 
 | Class | Interaction path | Detection confidence |
 |---|---|---|
-| `webmcp` | Structured tools through `navigator.modelContext` | Stable, exact signal when present |
+| `webmcp` | Structured tools through `document.modelContext` | Exact, once the agent activates or calls a tool |
 | `crawler` | Fetches/renders pages; identifies itself in `navigator.userAgent` | Signature match — high but spoofable |
 | `dom` | Browser automation over DOM/click/type APIs | Beta, heuristic confidence score |
-| `screenshot` | Pixel-level mouse and keyboard control | Not reliably detectable client-side |
+| `screenshot` | Vision models driving the mouse and keyboard from screenshots | Behaviour score (teleport / centre clicks, even typing) |
 
 ```ts
 const identity = await client.detect()
@@ -28,4 +28,4 @@ if (identity?.class === 'crawler') {
 
 **Crawlers** (`GPTBot`, `ClaudeBot`, `PerplexityBot`, `Googlebot`, …) are matched by their User-Agent token. Because a UA is self-reported, the match is high-confidence but not proof (`confidence: 0.9`), and client-side detection only catches crawlers that execute JavaScript — see [Detection](/docs/detection#crawlers) for the full signature list and caveats.
 
-**Screenshot agents** should declare themselves with `presentIdentity()` or `authenticate()` if they need more trust than anonymous browsing.
+**Screenshot (vision) agents** are spotted by how they interact — see [Detection](/docs/detection#vision-model-agents). To be trusted beyond detection they should authenticate, typically with [Web Bot Auth](/docs/auth/web-bot-auth).

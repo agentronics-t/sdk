@@ -1,123 +1,98 @@
 ---
-title: Connect to the dashboard
-description: Stream SDK events from your backend into the Agentronics Intelligence dashboard.
+title: Connect to the console
+description: Send traces and your tool registry to the Agentronics console, and pull back rules, approved descriptions and agent keys.
 ---
 
-# Connect to the dashboard
+# Connect to the console
 
-Every governed action the SDK takes — detections, auth, authz decisions, tool calls, memory access — is a [trace](/docs/observability). Stream those traces to the Agentronics Intelligence dashboard and they light up the **Detect, Auth, Authz, WebMCP Tools, Knaph, Logs, and Analytics** pages.
-
-The data flows **from your backend to ours**:
+The console and your site talk through your **server**, authenticated with an ingest key:
 
 ```
-browser SDK ──traces──► your backend ──Bearer agtx_ik_…──► POST /v1/sdk/events ──► dashboard
+browser SDK ──traces──► your relay ──┐
+your middleware ──auth results──────┼──Bearer agtx_ik_…──► Agentronics API ──► console pages
+your server ──tool registry─────────┘
+your server ◄── rules · approved descriptions · agent-key checks ──┘
 ```
 
 ## 1. Mint an ingest key
 
-In the dashboard, go to **Settings → SDK ingest keys → Create key** and copy the `agtx_ik_…` value. It's shown once.
+Console → **Settings → SDK ingest keys → Create key**. Copy the `agtx_ik_…` value (shown once) into your server's environment as `AGENTRONICS_INGEST_KEY`, with the API URL shown there as `AGENTRONICS_API_URL`.
 
 <Callout type="warn">
-  The ingest key is a **secret** — keep it on your server, never ship it to the
-  browser. The browser SDK should forward traces to your backend, which relays
-  them with the key (the key authenticates the tenant, the same way a publishable
-  key never leaves the client).
+  The ingest key is a **secret**. Keep it on your server — never in browser code.
 </Callout>
 
-## 2. Stream events
-
-### Option A — any backend (plain HTTP)
-
-No SDK required on the server. `POST` a batch of trace events:
-
-```bash
-curl -X POST https://<your-intel-api>/v1/sdk/events \
-  -H "authorization: Bearer agtx_ik_…" \
-  -H "content-type: application/json" \
-  -d '{
-    "events": [
-      {
-        "id": "evt_1",
-        "siteId": "shop-acme",
-        "sessionId": "sess_1",
-        "occurredAt": "2026-06-23T12:00:00Z",
-        "type": "agent.detected",
-        "outcome": "success",
-        "agent": { "class": "crawler", "trust": "detected", "vendor": "GPTBot" }
-      }
-    ]
-  }'
-```
-
-Ingest is idempotent on the event `id`, so retries are safe. The response is `{ ok, accepted, deduped }`.
-
-### Option B — a Node backend running the SDK
-
-If your server runs the SDK, wire `createIntelExporter` into the tracer and events stream automatically:
+## 2. One sync client
 
 ```ts
-import { init, createIntelExporter } from '@agentronics/sdk'
+// lib/agentronics.ts (server only)
+import { createDashboardExporter, createDashboardSync } from '@agentronics/sdk'
 
-const client = init({
-  publishableKey: process.env.AGENTRONICS_KEY!,
-  exporters: [
-    createIntelExporter({
-      url: process.env.INTEL_API_URL!,        // e.g. https://intel-api-….run.app
-      ingestKey: process.env.AGENTRONICS_INGEST_KEY!, // agtx_ik_…
-    }),
-  ],
+const opts = { url: process.env.AGENTRONICS_API_URL!, ingestKey: process.env.AGENTRONICS_INGEST_KEY! }
+export const sync = createDashboardSync({ ...opts, siteId: 'shop' })
+export const exporter = createDashboardExporter(opts)
+```
+
+## 3. Send what happens
+
+**Browser traces** — relay them (see [Observability](/docs/observability#sending-traces-to-the-console)):
+
+```ts
+// app/api/agentronics/route.ts
+import { createTraceRelay } from '@agentronics/sdk/server'
+
+const opts = { url: process.env.AGENTRONICS_API_URL!, ingestKey: process.env.AGENTRONICS_INGEST_KEY! }
+export const POST = createTraceRelay({ ...opts, siteId: 'shop' })
+// browser: Agentronics.init({ …, trace: { webhookUrl: '/api/agentronics' } })
+```
+
+**Server-side authentication** — report each agent request:
+
+```ts
+// middleware.ts
+import { agentronicsMiddleware } from '@agentronics/sdk/next'
+import { toTraceEvent } from '@agentronics/sdk/server'
+import { exporter, sync } from './lib/agentronics'
+
+export default agentronicsMiddleware({
+  apiKey: { verify: sync.keyVerifier() },
+  oauth2: { issuer: 'https://auth.shop.example', audience: 'https://shop.example' },
+  onResult: ({ result, request }) => {
+    const event = toTraceEvent(result, { siteId: 'shop', request })
+    if (event) exporter.export([event])
+  },
 })
 ```
 
-The exporter POSTs `TraceBatch`es to `/v1/sdk/events` with the key. It's server-only — the browser SDK can't send the secret key, so for client-side governance forward traces to your backend (e.g. via the webhook exporter) and relay them with Option A.
-
-## 3. Push the tool registry + site memory
-
-Trace events are lightweight — they don't carry your full tool schemas/token costs or your site-memory snapshot. To light up the **WebMCP Tools** and **Knaph** pages, push those explicitly after `syncTools()` / `provideSiteMemory(...)`:
+**Your tool registry** — so the WebMCP Tools and Memory pages know every tool, its description and its cost:
 
 ```ts
-import { createIntelSync } from '@agentronics/sdk'
-
-const intel = createIntelSync({
-  url: process.env.INTEL_API_URL!,
-  ingestKey: process.env.AGENTRONICS_INGEST_KEY!,
-  siteId: 'shop-acme',
-})
-
-await intel.pushTools(client.tools.list({ includeDisabled: true })) // → WebMCP Tools
-await intel.pushMemory(client.siteMemory.get(), 82)                 // → Knaph (snapshot + score)
+await sync.pushTools(tools) // GovernedTool[]; re-push whenever they change
 ```
 
-Or by plain HTTP (backend-agnostic):
+Tool *status* (callable / failed) arrives on its own, from the browser's `tool.surfaced` traces.
 
-```bash
-# tool registry → WebMCP Tools page
-curl -X POST https://<intel-api>/v1/sdk/tools -H "authorization: Bearer agtx_ik_…" \
-  -H "content-type: application/json" \
-  -d '{ "siteId":"shop-acme", "tools":[
-        { "name":"cart.add","group":"cart","page":"browse",
-          "inputSchema":{…},"outputSchema":{…},"tokens":42 } ] }'
+## 4. Pull what you manage in the console
 
-# site-memory snapshot → Knaph page
-curl -X POST https://<intel-api>/v1/sdk/memory -H "authorization: Bearer agtx_ik_…" \
-  -H "content-type: application/json" \
-  -d '{ "siteId":"shop-acme", "snapshot":{ "siteMap":{…}, "policies":{…} }, "score":82 }'
+```ts
+const { policies, toolDescriptions } = await sync.pullConfig()
 ```
 
-Both are idempotent upserts — re-push whenever your registry or memory changes.
+- `policies` — the rules from the **Authz** page, ready for `Agentronics.init({ policies })`.
+- `toolDescriptions` — descriptions approved on the **Memory** page, for `Agentronics.init({ toolDescriptions })`.
 
-## 4. Watch the pages populate
+Fetch them where you render the page (cache for a minute or so) and pass them to the browser SDK. Agent API keys are checked live by `sync.keyVerifier()` — no pull needed.
 
-Once events arrive, the dashboard's SDK pages fill in:
+## 5. What lights up
 
-| Page | Shows |
+| Page | From |
 |---|---|
-| Detect | Agents identified, by class (incl. crawlers) + vendor |
-| Auth | Identities presented, by protocol + trust |
-| Authz | Allow / blocked decisions |
-| WebMCP Tools | Synced registry, page-wise, with token cost |
-| Knaph | Site-memory snapshots + quality score |
-| Logs | Live event stream |
-| Analytics | Cross-pillar volume over time |
+| Detect | `agent.detected` traces — self-declared, WebMCP, vision, DOM, crawler |
+| Auth | `auth.identity_presented` — by method, failures and why, agents acting for users |
+| Authz | Your rules, plus allow / review / deny decisions |
+| WebMCP Tools | `pushTools` + `tool.surfaced` + `tool.executed` — status, calls, errors, p95 |
+| Memory | `pushTools` descriptions → AI rewrites you approve |
+| Observability | Every trace — sessions, filters, latency |
+| Analytics | Breakdowns by agent, method, tool and page |
 
-Until the first event lands, each page shows an empty state pointing back to Settings.
+Every endpoint is plain HTTPS + JSON (`POST /v1/sdk/events`, `/tools`, `/memory`, `/config`, `/agent-keys/verify` with `Authorization: Bearer agtx_ik_…`), so any backend can use it without the SDK. Ingest is idempotent on event `id`; past your plan's monthly event quota, events are dropped (never rejected) and the response says so.

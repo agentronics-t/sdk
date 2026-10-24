@@ -14,16 +14,32 @@ The point: agents stop thrashing through 60-tool menus. You ship one registry, t
 ```ts
 client.registerTool({
   name: 'cart.add',
+  title: 'Add to cart',                       // shown by browsers / agents
   group: 'cart',
   stage: 'browse',
   description: 'Add an item to the cart.',
+  annotations: { readOnlyHint: false },       // WebMCP hints — see below
   inputSchema: { type: 'object', properties: { itemId: { type: 'string' } } },
   outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } },
   authz: { minTrust: 'declared', allowedClasses: [], decision: 'allow' },
   rateLimit: { max: 3, windowSeconds: 60 },
-  execute: async (input, { identity }) => addItem(input, identity),
+  execute: async (input, { identity, signal }) => addItem(input, identity, { signal }),
 })
 ```
+
+`signal` is aborted if the agent cancels the call.
+
+### Annotations
+
+WebMCP tool annotations tell agents how careful to be:
+
+| Annotation | Meaning |
+|---|---|
+| `readOnlyHint` | Only reads — agents may call it without asking the user. |
+| `consequentialHint` | Payments, deletes, sends — the agent should confirm with the user first. |
+| `untrustedContentHint` | The output includes content you didn't write (reviews, messages) — the agent should treat it as untrusted. |
+
+`exposedTo: ['https://partner.example']` also lets agents on those origins see the tool.
 
 `outputSchema` is optional and, like `inputSchema`, is surfaced in the dashboard (see below). `authz` is forwarded into the policy engine automatically — every governed tool produces a matching `tool:<name>` policy rule.
 
@@ -68,15 +84,27 @@ const client = init({
 
 A stage transition emits `tool.progressed` with `{ from, to, trigger }` metadata. The next surfacing call sees the new stage.
 
-## WebMCP adapter
+## Publishing to WebMCP
 
-`client.publishToWebMcp({ identity })` calls `navigator.modelContext.provideContext({ tools: [...] })` with the surfaced subset. Each tool's `invoke` runs through the registry's policy pipeline, so denies are still enforced even when called by a WebMCP-native agent.
+`client.publishToWebMcp({ identity })` registers the surfaced tools with the browser, following the October 2026 WebMCP draft:
 
 ```ts
-client.publishToWebMcp({ identity: detected })
+const { surfaced, registrations } = client.publishToWebMcp({ identity })
+for (const r of await registrations) {
+  // { name: 'cart.add', status: 'callable' } or { name: 'x', status: 'failed', error: 'TypeError: …' }
+}
 ```
 
-The adapter no-ops in environments where `navigator.modelContext` is missing (server-side, locked-down browsers).
+- Each tool is registered with `await document.modelContext.registerTool(tool, { signal, exposedTo })`, with its `title`, `description`, `inputSchema` and `annotations`. `navigator.modelContext` (removed in Chrome 152) and old `provideContext()` polyfills are used only as fallbacks.
+- Re-publishing aborts the previous registrations (WebMCP has no `unregisterTool()` — the `AbortSignal` unregisters) and registers the new set. The SDK re-publishes by itself when the identity-gated set changes, and only then.
+- Every call from an agent runs through the registry's policy pipeline, so `deny` and `review` apply to WebMCP agents too.
+- The first `toolactivated` event or tool call marks the session as a WebMCP agent.
+
+The declarative form API (`<form toolname>`) was removed from the WebMCP spec in October 2026 and lives on only as an explainer, so the SDK registers every tool imperatively.
+
+### Tool status
+
+Each registration is traced as `tool.surfaced` with `metadata.state` = `published` or `failed` (and the browser's error). The console's **WebMCP Tools** page turns that into a per-tool status — **Callable**, **Failed** (with the reason), **Disabled**, or **Not seen** (synced, but no browser has registered it yet) — next to call counts, errors and p95 latency from `tool.executed` traces.
 
 ## Token budget
 
@@ -93,15 +121,15 @@ Tool descriptions cost tokens — every surfaced tool occupies space in the agen
 }
 ```
 
-The estimate is `Math.ceil(JSON.stringify(descriptor).length / 4)` — a rough OpenAI-style rule of thumb. Use it to reject overlarge tool sets before publishing.
+The estimate is ≈ characters / 4 of what an agent actually receives — `name`, `title`, `description`, `inputSchema` and `annotations` (policy and grouping stay on your site and cost the agent nothing). `descriptorTokens(tool)` gives the same number for one tool; the console uses the same formula. To cut it without touching your code, see [Procedural memory](/docs/concepts/procedural-memory).
 
 ## Syncing to the dashboard
 
-`client.syncTools()` pushes the full registry — each tool's `page` (stage), `group`, input/output schema, and estimated token cost — to the gateway so the **Tool management** page can render it:
+Push the full registry — each tool's `page` (stage), `group`, `title`, `description`, `annotations`, input/output schema and token cost — from your server so the console's **WebMCP Tools** page can render it:
 
 ```ts
-// after registering your tools
-await client.syncTools()
+const sync = createDashboardSync({ url: process.env.AGENTRONICS_API_URL!, ingestKey: process.env.AGENTRONICS_INGEST_KEY!, siteId: 'shop' })
+await sync.pushTools(tools) // your GovernedTool[]
 ```
 
 It's a cheap idempotent upsert — re-call it whenever your registry changes.
@@ -138,8 +166,8 @@ If a tool inflates `description` or `inputSchema` beyond reason, it lights up in
 | Event | When |
 |---|---|
 | `tool.registered` | A tool is added to the registry. |
-| `tool.surfaced` | Surfacing changes — `state` is `enabled`, `disabled`, or `published`. |
-| `tool.executed` | A tool runs — `outcome` is `success` or `blocked`. |
+| `tool.surfaced` | A tool was registered with WebMCP (`state: 'published'`), rejected (`'failed'`), or enabled / disabled in code. |
+| `tool.executed` | A tool runs — `outcome` is `success`, `error`, or `blocked` (denied or refused in review), with `durationMs`. |
 | `tool.progressed` | A stage transition fires. |
 
 Filter for `tool.*` in the dashboard to watch the surfacing layer in real time.
