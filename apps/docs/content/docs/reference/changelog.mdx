@@ -15,7 +15,9 @@ This page is regenerated from [Changesets](https://github.com/changesets/changes
 - **Detection:** vision-model (screenshot) agents, from interaction patterns; more automation-framework markers.
 - **Authentication:** verified crawlers also use vendors' published IP ranges; OAuth 2.1 with several issuers, delegated tokens (`onBehalfOf`, `act`), DPoP, and RFC 9728 metadata helpers. **Breaking:** browser tokens nothing has verified are `declared`, not `verified`. SSO, SPIFFE and mTLS are off by default (`previewAuthMethods()`).
 - **Authorization:** `review` asks the person on the page and never runs the tool without approval; no matching rule now means `allow`.
-- **Console sync:** `pullConfig()`, `keyVerifier()`, `init({ toolDescriptions })`, `setToolDescriptions()`, `createTraceRelay()`.
+- **Console sync:** `pullConfig()`, `keyVerifier()`, `init({ toolDescriptions })`, `setToolDescriptions()`, `createTraceRelay({ forward })`, `createAgentContextHandler()`.
+- **New API:** the retired `gateway.agentronics.dev` is replaced by `https://api.agentronics.dev/v1/pub/*` with console-issued publishable keys (allowed origins per key). `client.syncConfig()` pulls rules, approved descriptions and site memory in one call.
+- **Upgrading:** `compat: '0.6'` keeps the old behaviour while you move — see [Upgrading to 0.7](/docs/guides/upgrade-0-7).
 
 ### `@agentronics/protocol`
 

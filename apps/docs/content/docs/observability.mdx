@@ -66,7 +66,9 @@ The relay drops unknown event types, caps each batch at 100 events, and always a
 
 Server-side traces (e.g. from the auth middleware) go straight to the console with `createDashboardExporter({ url, ingestKey })` — see [Connect to the console](/docs/guides/connect-to-dashboard).
 
-Other exporters: `debug: true` adds a console exporter; `trace.exporters` takes your own `{ name, export(events) }`; `traceRate` / `errorRate` sample.
+**Without a server route:** `trace: { gateway: true }` sends traces straight from the browser to the Agentronics API with your publishable key. The key must list the page's origin (console → *Settings → Publishable keys*); calls from other origins are refused, and each key is rate-limited.
+
+Other exporters: `debug: true` adds a console exporter; `trace.exporters` takes your own `{ name, export(events) }`; `traceRate` / `errorRate` sample. To keep a copy of everything, pass `forward` to the relay — see [Data export](/docs/enterprise/data-export).
 
 ## PII scrub
 

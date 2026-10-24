@@ -178,3 +178,23 @@ describe('auth engine', () => {
     expect(previewAuthMethods().map((m) => m.name)).toEqual(['sso', 'spiffe', 'mtls'])
   })
 })
+
+describe("compat: '0.6' (upgrade path)", () => {
+  it('restores pre-0.7 trust for unverified tokens and turns the preview methods back on', async () => {
+    const engine = createAuthEngine({ compat: '0.6' })
+    expect(engine.methods()).toEqual(expect.arrayContaining(['sso', 'spiffe', 'mtls']))
+    expect((await engine.authenticate({ bearerToken: 'bearer_abcdef12' }))?.trust).toBe('verified')
+    expect((await engine.authenticate({ oauth2AccessToken: 'oauth_abcdef12', oauth2Subject: 'user_1' }))?.trust).toBe('linked')
+    expect((await engine.authenticate({ xAgentHeader: 'claude;webmcp;sig_123' }))?.trust).toBe('verified')
+    expect((await engine.authenticate({ ssoIdToken: 'eyJ.abc.def' }))?.signals.compat).toBe('0.6')
+  })
+
+  it('reports the first unverified credential once, so the upgrade is discoverable', async () => {
+    const onUnverifiedToken = vi.fn()
+    const engine = createAuthEngine({ onUnverifiedToken })
+    await engine.authenticate({ bearerToken: 'bearer_abcdef12' })
+    await engine.authenticate({ bearerToken: 'bearer_abcdef12' })
+    expect(onUnverifiedToken).toHaveBeenCalledOnce()
+    expect(onUnverifiedToken).toHaveBeenCalledWith('bearer')
+  })
+})

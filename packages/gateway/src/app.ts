@@ -104,6 +104,15 @@ export const createApp = ({
     })
   })
 
+  // The SDK (≥ 0.7) calls the hosted Agentronics API under /v1/pub/*. This
+  // gateway is retired from production but still the local dev backend for
+  // the demo, so it answers the same paths by dropping the /pub segment.
+  app.all('/v1/pub/*', (c) => {
+    const url = new URL(c.req.url)
+    url.pathname = url.pathname.replace(/^\/v1\/pub\//, '/v1/')
+    return app.fetch(new Request(url, c.req.raw), c.env)
+  })
+
   app.route('/', createPolicyRoutes({ storage, resolveSession }))
   app.route('/', createMemoryRoutes({ storage, resolveSession }))
   app.route('/', createToolRoutes({ storage, resolveSession }))

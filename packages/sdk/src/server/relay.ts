@@ -21,6 +21,11 @@ export interface TraceRelayOptions {
   siteId: string
   /** Max events accepted per request. Default 100. */
   maxEvents?: number
+  /**
+   * Also hand every accepted batch to your own sink — a warehouse, a queue,
+   * a webhook. Runs alongside the console export; failures are ignored.
+   */
+  forward?: (events: Array<Record<string, unknown>>) => unknown
   fetcher?: typeof fetch
 }
 
@@ -57,7 +62,12 @@ export function createTraceRelay(options: TraceRelayOptions) {
       .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null && KNOWN_TYPES.has(String((e as { type?: unknown }).type)))
       .slice(0, max)
       .map((e) => ({ ...e, siteId: options.siteId })) as unknown as Parameters<typeof exporter.export>[0]
-    if (events.length) await Promise.resolve(exporter.export(events)).catch(() => undefined)
+    if (events.length) {
+      await Promise.all([
+        Promise.resolve(exporter.export(events)).catch(() => undefined),
+        options.forward ? Promise.resolve().then(() => options.forward!(events as unknown as Array<Record<string, unknown>>)).catch(() => undefined) : undefined,
+      ])
+    }
     return new Response(null, { status: 202 })
   }
 }

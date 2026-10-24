@@ -52,3 +52,29 @@ describe('trace relay', () => {
     expect(await relay(new Request('https://shop.example/x', { method: 'GET' }))).toMatchObject({ status: 405 })
   })
 })
+
+describe('well-known agent context', () => {
+  it('serves the site memory from pullConfig, caches it, and keeps it when the console is down', async () => {
+    const { createAgentContextHandler } = await import('../../server/agentContext.js')
+    let up = true
+    const pullConfig = vi.fn(async () => {
+      if (!up) throw new Error('down')
+      return { policies: [], toolDescriptions: {}, siteMemory: { siteMap: { pages: [{ path: '/' }] } }, fetchedAt: '' }
+    })
+    const handler = createAgentContextHandler({ sync: { pullConfig }, cacheSeconds: 0 })
+    const res = await handler()
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ siteMap: { pages: [{ path: '/' }] } })
+    up = false
+    expect((await handler()).status).toBe(200)
+    const empty = createAgentContextHandler({ sync: { pullConfig: async () => ({ policies: [], toolDescriptions: {}, siteMemory: null, fetchedAt: '' }) } })
+    expect((await empty()).status).toBe(404)
+  })
+
+  it('the relay also forwards batches to your own sink', async () => {
+    const forward = vi.fn()
+    const relay = createTraceRelay({ url: 'https://api.example', ingestKey: 'k', siteId: 'shop', forward, fetcher: (async () => json({}, 202)) as unknown as typeof fetch })
+    await relay(new Request('https://shop.example/r', { method: 'POST', body: JSON.stringify({ events: [{ id: 'e', type: 'agent.detected' }] }) }))
+    expect(forward).toHaveBeenCalledWith([{ id: 'e', type: 'agent.detected', siteId: 'shop' }])
+  })
+})

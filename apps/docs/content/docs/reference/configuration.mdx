@@ -25,7 +25,8 @@ const client = Agentronics.init({
 |---|---|---|---|
 | `publishableKey` | `string` | *required* | Publishable key (`agtx_pk_*`). Secret keys (`agtx_sk_*`) throw `wrong_key_kind`. |
 | `siteId` | `string` | `'default'` | Stable identifier for this site — propagated onto every trace and gateway request. |
-| `gatewayUrl` | `string` | — | Local development only (`localhost` / `127.0.0.1`); anything else throws. |
+| `gatewayUrl` | `string` | `https://api.agentronics.dev` | Local development only (`localhost` / `127.0.0.1`); the retired `https://gateway.agentronics.dev` maps to the default; anything else throws. |
+| `compat` | `'0.6'` | — | Temporary: keep the 0.6 behaviour while upgrading. See [Upgrading to 0.7](/docs/guides/upgrade-0-7). |
 | `debug` | `boolean` | `false` | Enables the console trace exporter and verbose warnings. |
 | `policies` | `PolicyRule[]` | `[]` | Authorization rules — usually `pullConfig().policies` from the console. |
 | `toolDescriptions` | `Record<string, string>` | `{}` | Approved descriptions from the console's Memory page; replace the code's text when tools are published. |
@@ -42,6 +43,7 @@ const client = Agentronics.init({
 | `trace.errorRate` | `number` | `1.0` | Sampling rate for error traces. |
 | `trace.scrubPaths` | `string[]` | `[]` | JSONPath-ish paths scrubbed before export. |
 | `trace.webhookUrl` | `string` | — | Send traces to your relay route (`createTraceRelay`), which forwards them to the console. |
+| `trace.gateway` | `boolean` | `false` | Send traces straight to the Agentronics API with the publishable key (the page's origin must be on the key). |
 | `trace.exporters` | `TraceExporter[]` | `[]` | Custom exporters appended to the pipeline. |
 
 ## `AgentronicsClient`
@@ -54,6 +56,8 @@ client.authenticate({ … })             // → AgentIdentity | null
 client.presentIdentity({ … })          // → PresentedIdentity
 client.evaluate('checkout')            // → PolicyEvaluation
 client.setPolicies(rules)              // replace authorization rules
+client.syncConfig()                    // pull rules + approved descriptions + site memory (publishable key)
+client.ping()                          // check the key against the API
 client.registerTool({ name, … })       // → off()
 client.publishToWebMcp()               // → { surfaced, registrations: Promise<WebMcpRegistration[]> }
 client.setToolDescriptions(map)        // apply newly approved descriptions
@@ -68,7 +72,7 @@ client.vision?.score()                 // vision-agent score, 0–1
 
 | Import | What |
 |---|---|
-| `@agentronics/sdk/server` | `createAgentAuth`, `createAgentAuthHandler`, `expressAgentAuth`, `readAgentHeaders`, `toTraceEvent`, `createTraceRelay`, `protectedResourceMetadata`, `oauthChallenge`, `generateAgentKey`, `hashAgentKey`, `staticKeyVerifier`, `PUBLISHED_IP_RANGES` |
+| `@agentronics/sdk/server` | `createAgentAuth`, `createAgentAuthHandler`, `expressAgentAuth`, `readAgentHeaders`, `toTraceEvent`, `createTraceRelay`, `createAgentContextHandler`, `protectedResourceMetadata`, `oauthChallenge`, `generateAgentKey`, `hashAgentKey`, `staticKeyVerifier`, `PUBLISHED_IP_RANGES` |
 | `@agentronics/sdk/next` | `agentronicsMiddleware(options)` |
 | `@agentronics/sdk` (server use) | `createDashboardSync({ url, ingestKey, siteId })` → `pushTools`, `pushMemory`, `pullConfig`, `keyVerifier`; `createDashboardExporter({ url, ingestKey })` |
 

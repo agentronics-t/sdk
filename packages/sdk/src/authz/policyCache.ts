@@ -30,7 +30,7 @@ export const createPolicyCache = ({
 
     async sync(): Promise<PolicyCacheSnapshot> {
       const response = await fetcher(
-        `${gatewayUrl.replace(/\/$/, '')}/v1/sites/${encodeURIComponent(siteId)}/policies`,
+        `${gatewayUrl.replace(/\/$/, '')}/v1/pub/sites/${encodeURIComponent(siteId)}/policies`,
         {
           headers: {
             authorization: `Bearer ${publishableKey}`,

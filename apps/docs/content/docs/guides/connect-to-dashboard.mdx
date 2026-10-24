@@ -74,8 +74,16 @@ Tool *status* (callable / failed) arrives on its own, from the browser's `tool.s
 
 ## 4. Pull what you manage in the console
 
+**From the browser** — no server code; the publishable key is enough:
+
 ```ts
-const { policies, toolDescriptions } = await sync.pullConfig()
+await client.syncConfig() // rules + approved tool descriptions + site memory, applied immediately
+```
+
+**From your server** — when you render the page or want to cache:
+
+```ts
+const { policies, toolDescriptions, siteMemory } = await sync.pullConfig()
 ```
 
 - `policies` — the rules from the **Authz** page, ready for `Agentronics.init({ policies })`.

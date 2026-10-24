@@ -26,7 +26,7 @@ describe('memory cache', () => {
     expect(snapshot.memory?.siteMap?.pages[0]?.name).toBe('Home')
     expect(snapshot.etag).toBe('mem-1')
     expect(fetcher).toHaveBeenCalledWith(
-      'https://gateway.example/v1/sites/site_123/memory',
+      'https://gateway.example/v1/pub/sites/site_123/memory',
       expect.objectContaining({
         headers: expect.objectContaining({
           authorization: 'Bearer agtx_pk_demo_1234567890',

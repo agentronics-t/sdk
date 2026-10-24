@@ -2,6 +2,7 @@
   "title": "Guides",
   "pages": [
     "connect-to-dashboard",
+    "upgrade-0-7",
     "nextjs",
     "vite-react",
     "plain-html",

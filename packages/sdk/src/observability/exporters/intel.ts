@@ -103,6 +103,8 @@ export interface DashboardConfig {
   policies: PolicyRule[]
   /** tool name → approved description (replaces the code's description when published). */
   toolDescriptions: Record<string, string>
+  /** The site-memory snapshot last pushed for this site (null if none). */
+  siteMemory: Record<string, unknown> | null
   fetchedAt: string
 }
 
@@ -151,6 +153,7 @@ export const createIntelSync = ({
       return {
         policies: Array.isArray(body.policies) ? body.policies : [],
         toolDescriptions: body.toolDescriptions && typeof body.toolDescriptions === 'object' ? body.toolDescriptions : {},
+        siteMemory: body.siteMemory && typeof body.siteMemory === 'object' ? body.siteMemory : null,
         fetchedAt: typeof body.fetchedAt === 'string' ? body.fetchedAt : new Date().toISOString(),
       }
     },

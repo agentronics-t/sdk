@@ -5,6 +5,8 @@ import {
   type AgentIdentity,
   type PolicyEvaluation,
   type PolicyRule,
+  PolicyRule as PolicyRuleSchema,
+  SiteMemory as SiteMemorySchema,
   type TraceEvent,
 } from '@agentronics/protocol'
 import { detectAgent, type DetectAgentOptions } from './detection/index.js'
@@ -59,14 +61,15 @@ export interface InitOptions {
   publishableKey: string
   siteId?: string
   /**
-   * Override the gateway URL the SDK calls. **Reserved for local development
-   * only** — the only accepted values are `localhost` / `127.0.0.1` URLs (so
-   * `pnpm dev` against a local gateway works). Any other value throws at
-   * `init()` time.
+   * Override the Agentronics API URL the SDK calls. **Reserved for local
+   * development only** — the only accepted values are `localhost` /
+   * `127.0.0.1` URLs (so `pnpm dev` against a local API works). Any other
+   * value throws at `init()` time.
    *
-   * Production deployments must omit this option. The SDK is hard-coded to
-   * call `https://gateway.agentronics.dev`. Custom backends are not
-   * supported, by design — see the project README + LICENSE NOTICE.
+   * Production deployments must omit this option. The SDK calls
+   * `https://api.agentronics.dev` (the retired `gateway.agentronics.dev` is
+   * accepted and mapped to it). Custom backends are not supported, by
+   * design — see the project README + LICENSE NOTICE.
    *
    * @internal — kept on the public type only so dev tooling type-checks.
    */
@@ -83,6 +86,13 @@ export interface InitOptions {
    * Pass your own function to use your UI, or `false` to refuse every review.
    */
   review?: Reviewer | false
+  /**
+   * `'0.6'` keeps the pre-0.7 behaviour while you upgrade: unverified tokens
+   * count as `verified`, SSO / SPIFFE / mTLS are on, and `review` rules run
+   * without asking. Insecure and temporary — see the 0.7 upgrade guide.
+   * @deprecated Remove once you've moved to the 0.7 behaviour.
+   */
+  compat?: '0.6'
   /**
    * Approved tool descriptions from the console's Procedural memory page
    * (`createDashboardSync().pullConfig().toolDescriptions`). They replace the
@@ -155,6 +165,12 @@ export interface AgentronicsClient {
   evaluate(tool: string, options?: { identity?: AgentIdentity | null }): Promise<PolicyEvaluation>
   syncPolicies(): Promise<PolicyRule[]>
   syncSiteMemory(): Promise<SiteMemory | null>
+  /**
+   * Pull everything the console manages for this site with the publishable
+   * key alone — authorization rules, approved tool descriptions and site
+   * memory — and apply it (re-publishing WebMCP tools if they changed).
+   */
+  syncConfig(): Promise<{ policies: PolicyRule[]; toolDescriptions: Record<string, string>; siteMemory: SiteMemory | null }>
   provideSiteMemory(memory: Partial<SiteMemory>): SiteMemory
   provideForPage(input: ProvideForPageInput): void
   installMemoryDelivery(options?: {
@@ -195,10 +211,12 @@ export interface AgentronicsClient {
   ping(): Promise<{ ok: true; status: number; body: unknown } | { ok: false; status: number; error: string }>
 }
 
-const DEFAULT_GATEWAY_URL = 'https://gateway.agentronics.dev'
+const DEFAULT_GATEWAY_URL = 'https://api.agentronics.dev'
+/** The retired gateway host; still accepted so old configs keep working. */
+const RETIRED_GATEWAY_URL = 'https://gateway.agentronics.dev'
 
 /**
- * Lock the SDK to the canonical Agentronics gateway. The only override
+ * Lock the SDK to the canonical Agentronics API. The only override
  * accepted is a localhost / 127.0.0.1 URL — purely so contributors running
  * `pnpm dev` can hit a local gateway. Any other value (a competing host, a
  * proxy, an MITM target) throws synchronously, before any traces are
@@ -210,7 +228,8 @@ const DEFAULT_GATEWAY_URL = 'https://gateway.agentronics.dev'
  */
 const resolveGatewayUrl = (provided: string | undefined): string => {
   if (provided === undefined) return DEFAULT_GATEWAY_URL
-  if (provided === DEFAULT_GATEWAY_URL) return provided
+  if (provided.replace(/\/$/, '') === DEFAULT_GATEWAY_URL) return DEFAULT_GATEWAY_URL
+  if (provided.replace(/\/$/, '') === RETIRED_GATEWAY_URL) return DEFAULT_GATEWAY_URL
   let parsed: URL
   try {
     parsed = new URL(provided)
@@ -223,8 +242,8 @@ const resolveGatewayUrl = (provided: string | undefined): string => {
     return provided
   }
   throw new Error(
-    `Agentronics SDK does not support custom gateway URLs. ` +
-      `Omit \`gatewayUrl\` to use the canonical https://gateway.agentronics.dev. ` +
+    `Agentronics SDK does not support custom API URLs. ` +
+      `Omit \`gatewayUrl\` to use the canonical ${DEFAULT_GATEWAY_URL}. ` +
       `The only accepted override is a localhost / 127.0.0.1 URL for local development. ` +
       `Got: ${provided}`
   )
@@ -282,6 +301,20 @@ export const init = (options: InitOptions): AgentronicsClient => {
     onTrace: emitTrace,
   }
   if (options.auth !== undefined) authOptions.context = options.auth
+  if (options.compat === '0.6') {
+    authOptions.compat = '0.6'
+    console.warn(
+      "[agentronics] compat: '0.6' is on — unverified tokens are trusted and review rules run without asking. " +
+        'Remove it once you have upgraded: https://agentronics.dev/docs/guides/upgrade-0-7'
+    )
+  }
+  authOptions.onUnverifiedToken = (method) => {
+    if (options.compat === '0.6') return
+    console.warn(
+      `[agentronics] A ${method} credential was presented but nothing verifies it, so the agent is 'declared', not 'verified'. ` +
+        'Wire auth.verifyToken to your backend: https://agentronics.dev/docs/auth/overview#in-the-browser'
+    )
+  }
   const auth = createAuthEngine(authOptions)
   const agentContext = createAgentContextStore()
   const policyEngine = createPolicyEngine(policies)
@@ -329,10 +362,13 @@ export const init = (options: InitOptions): AgentronicsClient => {
     }
     return policy
   }
+  // compat '0.6': review rules ran the tool without asking before 0.7.
+  const legacyReviewer: Reviewer = async () => true
   const reviewer: Reviewer | undefined =
     options.review === false
       ? undefined
-      : (options.review ?? (typeof document === 'undefined' ? undefined : createReviewPrompt()))
+      : (options.review ??
+        (options.compat === '0.6' ? legacyReviewer : typeof document === 'undefined' ? undefined : createReviewPrompt()))
   const tools = createToolRegistry({
     evaluate,
     ...(reviewer ? { reviewer } : {}),
@@ -370,6 +406,13 @@ export const init = (options: InitOptions): AgentronicsClient => {
     })
   const surfaceFor = (identity: AgentIdentity | null) =>
     withDescriptions(surfaceTools(tools.list(), surfacingContext(identity)))
+  const applyToolDescriptions = (descriptions: Record<string, string>) => {
+    toolDescriptions = { ...descriptions }
+    if (publishedKey !== null) {
+      publishedKey = null // descriptions changed: re-register even if the names didn't
+      republish(surfaceFor(agentContext.snapshot().identity))
+    }
+  }
 
   // Names of the last published set; null until the host first publishes.
   let publishedKey: string | null = null
@@ -537,6 +580,27 @@ export const init = (options: InitOptions): AgentronicsClient => {
       }
       return snapshot.memory
     },
+    syncConfig: async () => {
+      const response = await fetch(
+        `${gatewayUrl.replace(/\/$/, '')}/v1/pub/sites/${encodeURIComponent(siteId)}/config`,
+        { headers: { authorization: `Bearer ${publishableKey}` } }
+      )
+      if (!response.ok) throw new Error(`Config sync failed with status ${response.status}.`)
+      const body = (await response.json()) as {
+        policies?: unknown
+        toolDescriptions?: Record<string, string>
+        siteMemory?: unknown
+      }
+      const rules = PolicyRuleSchema.array().parse(body.policies ?? [])
+      policyEngine.set(rules)
+      emitTrace({ type: 'authz.policies_set', metadata: { count: rules.length, synced: true } })
+      const memory = body.siteMemory && typeof body.siteMemory === 'object' && Object.keys(body.siteMemory).length
+        ? siteMemory.replace(SiteMemorySchema.parse(body.siteMemory))
+        : null
+      const descriptions = body.toolDescriptions && typeof body.toolDescriptions === 'object' ? body.toolDescriptions : {}
+      applyToolDescriptions(descriptions)
+      return { policies: rules, toolDescriptions: descriptions, siteMemory: memory }
+    },
     provideSiteMemory: (next: Partial<SiteMemory>) => siteMemory.provide(next),
     provideForPage: (input: ProvideForPageInput) => {
       siteMemory.provideForPage(input)
@@ -570,13 +634,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
         getIdentity: () => detect({ webmcp: { pollMs: 0 } }),
       }),
     registerTool: (tool: GovernedTool) => tools.register(tool),
-    setToolDescriptions: (descriptions: Record<string, string>) => {
-      toolDescriptions = { ...descriptions }
-      if (publishedKey !== null) {
-        publishedKey = null // descriptions changed: re-register even if the names didn't
-        republish(surfaceFor(agentContext.snapshot().identity))
-      }
-    },
+    setToolDescriptions: (descriptions: Record<string, string>) => applyToolDescriptions(descriptions),
     syncTools: async () => {
       const all = tools.list({ includeDisabled: true })
       const count = await toolSync.push(all)
@@ -612,7 +670,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
     clearTraces: () => tracer.clear(),
     async ping() {
       try {
-        const response = await fetch(`${gatewayUrl.replace(/\/$/, '')}/v1/health`, {
+        const response = await fetch(`${gatewayUrl.replace(/\/$/, '')}/v1/pub/health`, {
           method: 'GET',
           headers: { authorization: `Bearer ${publishableKey}` },
         })

@@ -51,3 +51,4 @@ export {
 } from './oauth.js'
 export { jwkThumbprint, signatureBase, type PublicJwk, type SignatureAlgorithm } from './httpSignatures.js'
 export { createTraceRelay, type TraceRelayOptions } from './relay.js'
+export { createAgentContextHandler, type AgentContextHandlerOptions } from './agentContext.js'

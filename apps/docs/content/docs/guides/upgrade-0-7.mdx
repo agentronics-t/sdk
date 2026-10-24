@@ -1,0 +1,82 @@
+---
+title: Upgrading to 0.7
+description: What changed in SDK 0.7, how to upgrade without breaking anything, and how to finish the move.
+---
+
+# Upgrading to 0.7
+
+0.7 tightens three behaviours that were unsafe and moves the SDK to the new Agentronics API. To upgrade **without changing behaviour**, add one line:
+
+```ts
+Agentronics.init({
+  publishableKey,
+  compat: '0.6', // temporary — keeps the 0.6 behaviour while you upgrade
+})
+```
+
+It logs a warning on every page load. Then work through the steps below and delete it.
+
+## The three behaviour changes
+
+| | 0.6 | 0.7 | With `compat: '0.6'` |
+|---|---|---|---|
+| A token presented in the browser with no verifier (`bearer`, `oauth2`, `sessionLink`, `extensionToken`, `X-Agent` proof) | `verified` (or `linked`) | `declared` | `verified` (or `linked`) |
+| SSO, SPIFFE, mTLS auth methods | on by default | off — `previewAuthMethods()` | on |
+| A rule with `decision: 'review'` | the tool ran | the person on the page is asked first | the tool runs |
+
+Everything else is additive: new options, new return fields, new detectors.
+
+### 1. Verify browser tokens
+
+An identity the browser can't check is only a claim, so 0.7 calls it `declared`. If your rules use `minTrust: 'verified'` or `'linked'` and your agents present tokens in the browser, wire a verifier — your backend checks the token with the server SDK and returns the result:
+
+```ts
+Agentronics.init({
+  publishableKey,
+  auth: {
+    verifyToken: async (method, token) => {
+      const res = await fetch('/api/agentronics/verify', { method: 'POST', body: JSON.stringify({ method, token }) })
+      return res.ok ? res.json() : null // { trust, vendor, validUntil, subject? }
+    },
+  },
+})
+```
+
+Better still, authenticate on the server where you can: [Web Bot Auth](/docs/auth/web-bot-auth), [OAuth 2.1](/docs/auth/oauth), [agent API keys](/docs/auth/api-keys). Until a verifier is wired, the SDK logs one warning per page the first time an unverified token arrives.
+
+### 2. SSO, SPIFFE, mTLS
+
+They're coming later as console features. If you rely on them today, keep them on explicitly:
+
+```ts
+import { createAuthEngine, defaultAuthMethods, previewAuthMethods } from '@agentronics/sdk'
+
+createAuthEngine({ methods: [...defaultAuthMethods(), ...previewAuthMethods()] })
+```
+
+### 3. Review rules
+
+`review` now means *ask the person on the page* (a small Allow / Not now dialog). If you had `review` rules that should just run, change them to `allow` — or pass your own `review` function. On a server, with no reviewer, `review` calls are refused.
+
+## The API moved
+
+`gateway.agentronics.dev` is retired. The SDK now calls `https://api.agentronics.dev/v1/pub/*` (old configs that name the gateway are mapped automatically). What you need:
+
+- **A publishable key from the console** — *Settings → Publishable keys*. List your site's origins on the key: the API only accepts traces and tool registries from them; reads (rules, approved descriptions, site memory) work from anywhere.
+- `client.syncPolicies()`, `syncSiteMemory()`, `syncTools()`, `ping()` and `trace.gateway: true` work as before against the new API.
+- New: `client.syncConfig()` pulls rules, approved tool descriptions and site memory in one call.
+
+## WebMCP
+
+0.7 follows the October 2026 WebMCP draft (`document.modelContext.registerTool`, unregistered by `AbortSignal`). The old `navigator.modelContext.provideContext` polyfills still work as a fallback. Two visible differences:
+
+- `publishToWebMcp()` also returns `registrations` (each tool's status).
+- A WebMCP agent is detected when it **uses** a tool, not when `document.modelContext` exists — every visitor of a WebMCP browser has it.
+
+## Checklist
+
+1. Upgrade with `compat: '0.6'`. Nothing changes.
+2. Mint a publishable key with your origins; swap it into `init()`.
+3. Wire `auth.verifyToken` (or move auth to the server).
+4. Change `review` rules that should run silently to `allow`.
+5. Remove `compat`.

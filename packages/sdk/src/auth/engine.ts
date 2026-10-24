@@ -63,6 +63,29 @@ export interface AuthEngineOptions {
   methods?: AuthMethod[]
   context?: AuthContext
   onTrace?: (input: TraceInput) => void
+  /**
+   * `'0.6'` restores the pre-0.7 behaviour: tokens nothing has verified count
+   * as `verified` (or `linked` with a user id), and SSO / SPIFFE / mTLS are in
+   * the default methods. Insecure — for upgrading without changes; remove it
+   * once `auth.verifyToken` is wired. See the 0.7 upgrade guide.
+   */
+  compat?: '0.6'
+  /** Called once, the first time a credential arrives with no verifier configured. */
+  onUnverifiedToken?: (method: AuthMethodName) => void
+}
+
+const TOKEN_METHODS = new Set<AuthMethodName>(['bearer', 'extensionToken', 'sessionLink', 'oauth2', 'sso', 'spiffe', 'mtls'])
+
+/** Pre-0.7 trust for an identity no verifier checked (compat '0.6' only). */
+const legacyTrust = (method: AuthMethodName, identity: AgentIdentity, input: AuthInput): AgentIdentity => {
+  if (TOKEN_METHODS.has(method) && identity.signals?.verifiedRemotely === false) {
+    const linked = (method === 'oauth2' && input.oauth2Subject) || (method === 'sessionLink' && input.linkedUserId)
+    return { ...identity, trust: linked ? 'linked' : 'verified', signals: { ...identity.signals, compat: '0.6' } }
+  }
+  if (method === 'xAgentHeader' && identity.signals?.hasProof === true) {
+    return { ...identity, trust: 'verified', confidence: 1, signals: { ...identity.signals, compat: '0.6' } }
+  }
+  return identity
 }
 
 /**
@@ -111,18 +134,28 @@ const resolveTraceProtocol = (
 }
 
 export const createAuthEngine = ({
-  methods = defaultAuthMethods(),
+  compat,
+  methods = compat === '0.6' ? [...defaultAuthMethods(), ...previewAuthMethods()] : defaultAuthMethods(),
   context = {},
   onTrace,
-}: AuthEngineOptions = {}) => ({
+  onUnverifiedToken,
+}: AuthEngineOptions = {}) => {
+  let warned = false
+  return {
   async authenticate(input: AuthInput): Promise<AgentIdentity | null> {
     const identities: Array<{ method: AuthMethodName; identity: AgentIdentity }> = []
     const methodResults: Record<string, boolean> = {}
 
     for (const method of methods) {
-      const identity = await method.authenticate(input, context)
+      let identity = await method.authenticate(input, context)
       methodResults[method.name] = Boolean(identity)
-      if (identity) identities.push({ method: method.name, identity })
+      if (!identity) continue
+      if (TOKEN_METHODS.has(method.name) && identity.signals?.verifiedRemotely === false && !context.verifyToken && !warned) {
+        warned = true
+        onUnverifiedToken?.(method.name)
+      }
+      if (compat === '0.6') identity = legacyTrust(method.name, identity, input)
+      identities.push({ method: method.name, identity })
     }
 
     const winner = highestTrust(identities.map((entry) => entry.identity))
@@ -153,6 +186,7 @@ export const createAuthEngine = ({
   methods(): AuthMethodName[] {
     return methods.map((method) => method.name)
   },
-})
+  }
+}
 
 export type AuthEngine = ReturnType<typeof createAuthEngine>

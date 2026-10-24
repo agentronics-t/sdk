@@ -7,10 +7,12 @@ export interface DetectorSignature {
 
 export interface SignatureLoaderOptions {
   gatewayUrl: string
+  /** Your publishable key — the Agentronics API requires it. */
+  publishableKey?: string
   fetcher?: typeof fetch
 }
 
-export const createSignatureLoader = ({ gatewayUrl, fetcher = fetch }: SignatureLoaderOptions) => {
+export const createSignatureLoader = ({ gatewayUrl, publishableKey, fetcher = fetch }: SignatureLoaderOptions) => {
   let etag: string | null = null
   let signatures: DetectorSignature[] = []
 
@@ -19,8 +21,11 @@ export const createSignatureLoader = ({ gatewayUrl, fetcher = fetch }: Signature
       return [...signatures]
     },
     async sync(): Promise<DetectorSignature[]> {
-      const response = await fetcher(`${gatewayUrl.replace(/\/$/, '')}/v1/detector-signatures`, {
-        headers: etag ? { 'if-none-match': etag } : {},
+      const response = await fetcher(`${gatewayUrl.replace(/\/$/, '')}/v1/pub/detector-signatures`, {
+        headers: {
+          ...(publishableKey ? { authorization: `Bearer ${publishableKey}` } : {}),
+          ...(etag ? { 'if-none-match': etag } : {}),
+        },
       })
       if (response.status === 304) return this.snapshot()
       if (!response.ok) throw new Error(`Detector signature sync failed with status ${response.status}.`)

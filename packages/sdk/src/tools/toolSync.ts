@@ -31,7 +31,7 @@ export interface ToolSyncOptions {
   fetcher?: typeof fetch
 }
 
-/** Pushes the full tool registry to the gateway for dashboard display. */
+/** Pushes the full tool registry to the Agentronics API (publishable key; the key's allowed origins only). */
 export const createToolSync = ({
   gatewayUrl,
   siteId,
@@ -41,7 +41,7 @@ export const createToolSync = ({
   async push(tools: GovernedTool[]): Promise<number> {
     const descriptors = tools.map(toToolDescriptor)
     const response = await fetcher(
-      `${gatewayUrl.replace(/\/$/, '')}/v1/sites/${encodeURIComponent(siteId)}/tools`,
+      `${gatewayUrl.replace(/\/$/, '')}/v1/pub/sites/${encodeURIComponent(siteId)}/tools`,
       {
         method: 'PUT',
         headers: {
