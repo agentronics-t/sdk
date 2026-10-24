@@ -98,7 +98,7 @@ export function CompletenessList({ items }: { items: { label: string; present: b
               flex: 'none',
               fontSize: 11,
               fontWeight: 800,
-              color: it.present ? '#fff' : 'var(--content-muted)',
+              color: it.present ? 'var(--surface)' : 'var(--content-muted)',
               background: it.present ? 'var(--success)' : 'var(--surface-raised)',
               border: it.present ? 'none' : '1px solid var(--border-strong)',
             }}

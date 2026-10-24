@@ -2,11 +2,13 @@ import type { ReactNode } from 'react'
 import { DocsLayout } from 'fumadocs-ui/layouts/docs'
 import { source } from '../../lib/source'
 
-/** Logomark + sentence-case wordmark + a small DOCS pill — design brief 03 §4. */
+/** Copper A mark + wordmark + a small DOCS pill. Mark geometry matches agentronics.dev (Logo.tsx MARK_PATH). */
 const NavTitle = () => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-    <img src="/docs-static/icon.svg" alt="" width={22} height={22} style={{ borderRadius: 5 }} />
-    <span style={{ fontWeight: 600, letterSpacing: '-0.02em' }}>agentronics</span>
+    <svg width={21} height={20} viewBox="0 0 835 800" aria-hidden>
+      <path fill="#E8763A" d="M458 0L835 660L317 660L368 570L664 570L458 209L119 800L0 800Z" />
+    </svg>
+    <span style={{ fontFamily: 'var(--font-display), sans-serif', fontWeight: 700, letterSpacing: '-0.02em' }}>agentronics</span>
     <span
       style={{
         fontSize: 10,
