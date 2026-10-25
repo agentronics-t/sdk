@@ -1,6 +1,6 @@
 {
   "name": "@agentronics/sdk",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Govern AI agents on your site — detect them (WebMCP, browser, vision, crawlers), authenticate them (Web Bot Auth, OAuth 2.1, agent API keys, verified crawlers), authorize every WebMCP tool call (allow / deny / review), and observe it all.",
   "license": "Apache-2.0",
   "repository": {
