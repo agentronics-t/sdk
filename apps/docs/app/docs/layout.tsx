@@ -2,12 +2,12 @@ import type { ReactNode } from 'react'
 import { DocsLayout } from 'fumadocs-ui/layouts/docs'
 import { source } from '../../lib/source'
 
-/** The logo (lime A on a red square) + wordmark + a small DOCS pill. Same geometry as agentronics.dev (Logo.tsx MARK_PATH). */
+/** The logo (red A on a lime square) + wordmark + a small DOCS pill. Same geometry as agentronics.dev (Logo.tsx MARK_PATH). */
 const NavTitle = () => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
     <svg width={24} height={24} viewBox="0 0 32 32" aria-hidden>
-      <rect width="32" height="32" rx="9" fill="#FF4D1F" />
-      <path transform="translate(8 8.33) scale(.019162)" fill="#D4FF3A" d="M458 0L835 660L317 660L368 570L664 570L458 209L119 800L0 800Z" />
+      <rect width="32" height="32" rx="9" fill="#D4FF3A" />
+      <path transform="translate(8 8.33) scale(.019162)" fill="#FF4D1F" d="M458 0L835 660L317 660L368 570L664 570L458 209L119 800L0 800Z" />
     </svg>
     <span style={{ fontFamily: 'var(--font-display), sans-serif', fontWeight: 700, letterSpacing: '-0.02em' }}>agentronics</span>
     <span
