@@ -3,8 +3,11 @@
  * Used by every Agentronics surface (docs / demo / dashboard / gateway-landing
  * / SDK overlays). Locked palette per coding_plan.md Phase 10.1.
  *
- * Indigo primary, dark navy bg, Amber for the logomark and highlights only.
- * Space Mono is the canonical typeface — load via the matching `fonts.css`.
+ * The Agentronics design system (the cofounder's redesign): ink #0B0B0C and
+ * white, lime #D4FF3A for go / ready / the primary action (with ink text),
+ * amber #FFB224 for partly ready / ask first, red #FF4D1F for not ready /
+ * deny and the logo square. Funnel Display / Funnel Sans / Martian Mono, via
+ * the matching `fonts.css`.
  *
  * Dark-only by decision; do not re-introduce a `prefers-color-scheme: light`
  * branch here — if a light theme is needed later add it as an explicit
@@ -13,31 +16,30 @@
 
 :root {
   /* Accent — used for primary buttons, links, focus rings, active state. */
-  --accent: #6366f1;
-  --accent-strong: #818cf8;
-  --accent-on: #07091a;
+  --accent: #d4ff3a;
+  --accent-strong: #e4ff7a;
+  --accent-on: #0b0b0c;
 
-  /* Highlight — reserved for the Agentronics logomark, eyebrow pills, and
-   * panel titles. Never body text. */
-  --highlight: #f59e0b;
-  --highlight-strong: #d97706;
+  /* Highlight — the logo square's red. Never body text. */
+  --highlight: #ff4d1f;
+  --highlight-strong: #e0401a;
 
   /* Surfaces. */
-  --bg: #07091a;
-  --bg-elevated: #0d1028;
-  --bg-muted: #11152f;
-  --border: #1f2547;
-  --border-strong: #2c3360;
+  --bg: #0b0b0c;
+  --bg-elevated: #161618;
+  --bg-muted: #222225;
+  --border: #2c2c2e;
+  --border-strong: #4a4a4e;
 
   /* Typography colors. */
-  --text: #f4f4f5;
-  --text-muted: #a4a8c5;
-  --text-faint: #6b6f8e;
+  --text: #ffffff;
+  --text-muted: #b5b5b8;
+  --text-faint: #8a8a8e;
 
   /* Semantic states. */
-  --danger: #f87171;
-  --success: #4ade80;
-  --warning: #fbbf24;
+  --danger: #ff6a42;
+  --success: #d4ff3a;
+  --warning: #ffb224;
 
   /* Shape + elevation. */
   --radius: 10px;
@@ -45,8 +47,9 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 
-  /* Type — Space Mono everywhere. Load via @agentronics/theme/fonts.css or a
-   * framework-native font loader (next/font/google for SSR). */
-  --font-sans: 'Space Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --font-mono: 'Space Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Type. Load via @agentronics/theme/fonts.css or a framework-native font
+   * loader (next/font/google for SSR). */
+  --font-display: 'Funnel Display', 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Funnel Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Martian Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 }

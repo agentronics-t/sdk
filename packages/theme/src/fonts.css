@@ -1,5 +1,5 @@
-/* Space Mono via Google Fonts. Use this in Vite-style apps and CSS-only
- * surfaces; Next apps should prefer next/font/google for SSR safety and
- * automatic preconnect, then assign the resulting CSS variable to
- * `--font-sans` / `--font-mono`. */
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+/* The design system's fonts via Google Fonts: Funnel Display (headlines),
+ * Funnel Sans (text), Martian Mono (labels, code). Next apps should prefer
+ * next/font/google and assign the CSS variables to --font-display /
+ * --font-sans / --font-mono. */
+@import url('https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&family=Funnel+Sans:wght@300..800&family=Martian+Mono:wdth,wght@75..112.5,300..700&display=swap');

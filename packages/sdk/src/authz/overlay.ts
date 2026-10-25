@@ -23,12 +23,12 @@ export const showDenyOverlay = ({
     transform: 'translateX(-50%)',
     maxWidth: 'min(520px, calc(100vw - 32px))',
     padding: '12px 16px',
-    borderRadius: '8px',
-    background: '#07091A',
-    color: '#F4F4F5',
-    border: '1px solid #6366F1',
-    boxShadow: '0 20px 48px -16px rgba(7,9,26,0.55)',
-    font: "13px/1.45 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+    borderRadius: '12px',
+    // ink with the design system's red, the colour for "deny"
+    background: '#0B0B0C',
+    color: '#FFFFFF',
+    border: '2px solid #FF4D1F',
+    font: '13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace',
   })
 
   documentRef.body.appendChild(node)

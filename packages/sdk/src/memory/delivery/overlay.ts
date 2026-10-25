@@ -14,14 +14,14 @@ bottom: 16px;
 right: 16px;
 max-width: 320px;
 padding: 10px 12px;
-background: rgba(17, 24, 39, 0.92);
-color: #f9fafb;
+background: rgba(11, 11, 12, 0.92);
+color: #ffffff;
 font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
-border-radius: 8px;
+border: 1px solid rgba(255, 255, 255, 0.15);
+border-radius: 10px;
 z-index: 2147483647;
 opacity: ${hidden ? '0' : '1'};
 pointer-events: ${hidden ? 'none' : 'auto'};
-box-shadow: 0 12px 32px rgba(15, 23, 42, 0.35);
 `
 
 const summarize = (snapshot: SiteMemory): string => {

@@ -47,7 +47,7 @@ export const createReviewPrompt = ({
         position: 'fixed',
         inset: '0',
         zIndex: '2147483647',
-        background: 'rgba(7,9,26,0.45)',
+        background: 'rgba(11,11,12,0.45)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -61,10 +61,11 @@ export const createReviewPrompt = ({
       Object.assign(dialog.style, {
         width: 'min(440px, 100%)',
         background: '#FFFFFF',
-        color: '#0F172A',
-        borderRadius: '12px',
+        color: '#0B0B0C',
+        border: '2px solid #0B0B0C',
+        borderRadius: '16px',
         padding: '20px',
-        boxShadow: '0 24px 60px -20px rgba(7,9,26,0.6)',
+        boxShadow: '8px 8px 0 #0B0B0C',
         font: "14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif",
       })
 
@@ -76,7 +77,7 @@ export const createReviewPrompt = ({
 
       const body = doc.createElement('div')
       body.style.margin = '8px 0 0'
-      body.style.color = '#475569'
+      body.style.color = 'rgba(11,11,12,0.65)'
       body.textContent = request.description ?? 'Allow this action on your behalf?'
 
       const details = doc.createElement('pre')
@@ -85,9 +86,10 @@ export const createReviewPrompt = ({
         display: summary ? 'block' : 'none',
         margin: '12px 0 0',
         padding: '10px 12px',
-        background: '#F1F5F9',
-        borderRadius: '8px',
+        background: 'rgba(11,11,12,0.06)',
+        borderRadius: '10px',
         fontSize: '12px',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         whiteSpace: 'pre-wrap',
         overflowWrap: 'anywhere',
       })
@@ -100,13 +102,15 @@ export const createReviewPrompt = ({
         b.type = 'button'
         b.textContent = label
         Object.assign(b.style, {
-          padding: '8px 14px',
-          borderRadius: '8px',
-          border: primary ? '1px solid #4F46E5' : '1px solid #CBD5E1',
-          background: primary ? '#4F46E5' : '#FFFFFF',
-          color: primary ? '#FFFFFF' : '#0F172A',
+          padding: '9px 16px',
+          borderRadius: '10px',
+          border: '2px solid #0B0B0C',
+          // Agentronics design system: lime is the "go" action, always with ink text
+          background: primary ? '#D4FF3A' : '#FFFFFF',
+          color: '#0B0B0C',
+          boxShadow: primary ? '3px 3px 0 #0B0B0C' : 'none',
           font: 'inherit',
-          fontWeight: '600',
+          fontWeight: '650',
           cursor: 'pointer',
         })
         return b
