@@ -8,7 +8,7 @@ on:
 jobs:
   playwright:
     name: Playwright (smoke gate)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # ubuntu-latest is 26.04, which the pinned Playwright has no Chromium build for
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
