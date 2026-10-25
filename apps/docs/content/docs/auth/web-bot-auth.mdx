@@ -1,0 +1,54 @@
+---
+title: Web Bot Auth
+description: Verify agents that sign every request with RFC 9421 HTTP message signatures.
+---
+
+# Web Bot Auth
+
+Web Bot Auth lets an agent prove which operator runs it by signing each HTTP request. It's the method most agent platforms ship today: OpenAI signs ChatGPT agent requests, Cloudflare's Signed Agents program (Browserbase, Anchor, Goose and others) uses it, and Cloudflare, AWS, Akamai and Vercel verify it at the edge. The IETF adopted it as a working-group draft in September 2026.
+
+## How it works
+
+1. The agent publishes its public keys at `https://<operator>/.well-known/http-message-signatures-directory`.
+2. Every request carries three headers:
+   - `Signature-Agent: "https://chatgpt.com"` — where to find the keys;
+   - `Signature-Input` — which parts of the request are signed, the key id, `created` / `expires`, and the `web-bot-auth` tag;
+   - `Signature` — the signature itself (Ed25519, ECDSA P-256 or RSA-PSS).
+3. The SDK fetches the directory (SSRF-guarded, cached), checks the signature over the request, the time window and the nonce, and returns the operator's URL as the agent id.
+
+## Use it
+
+It's **on by default** in `createAgentAuth()` and the middleware:
+
+```ts
+import { createAgentAuth } from '@agentronics/sdk/server'
+
+const auth = createAgentAuth()
+const result = await auth.authenticate(request)
+// → { status: 'verified', agent: { id: 'https://chatgpt.com', name: 'ChatGPT agent', vendor: 'OpenAI', method: 'web-bot-auth' } }
+```
+
+## Options
+
+```ts
+createAgentAuth({
+  webBotAuth: {
+    allowedDirectories: ['https://chatgpt.com'], // only these signers (default: any public HTTPS signer)
+    requireNonce: true,                           // refuse signatures without a nonce
+    clockSkewSec: 60,
+    maxValiditySec: 86_400,
+    authority: (req, url) => url.host,            // when a proxy rewrites Host
+  },
+  replayCache: myRedisReplayCache,                // share nonces across instances
+})
+```
+
+Pass `webBotAuth: false` to turn it off.
+
+## Failure reasons
+
+An invalid signature returns `{ status: 'unverified', reason: 'web-bot-auth:<reason>' }` — e.g. `signature_expired`, `unknown_key`, `directory_unreachable`, `replayed_nonce`. The console's **Auth** page groups these under *Why proofs failed*.
+
+## Payments
+
+Visa's Trusted Agent Protocol signs requests the same way, against a Visa-operated key directory. Support for it — and for AP2 payment mandates — is planned alongside checkout tools.

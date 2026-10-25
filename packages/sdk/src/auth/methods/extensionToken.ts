@@ -8,7 +8,8 @@ export const extensionToken = (): AuthMethod => ({
     const verified = await context.verifyToken?.('extensionToken', input.extensionToken)
     return {
       class: 'dom',
-      trust: verified?.trust ?? 'verified',
+      // Nothing checked the token → only a claim. A verifier (auth.verifyToken) decides the real trust.
+      trust: verified?.trust ?? 'declared',
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'browser-extension',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,

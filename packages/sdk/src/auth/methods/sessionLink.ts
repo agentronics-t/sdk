@@ -8,7 +8,7 @@ export const sessionLink = (): AuthMethod => ({
     const verified = await context.verifyToken?.('sessionLink', input.sessionLinkToken)
     return {
       class: input.classHint ?? 'screenshot',
-      trust: input.linkedUserId ? 'linked' : verified?.trust ?? 'verified',
+      trust: verified ? (input.linkedUserId && verified.trust !== 'detected' && verified.trust !== 'declared' ? 'linked' : verified.trust) : 'declared',
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'session-link',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,

@@ -27,7 +27,30 @@ import {
   type PresentIdentityOptions,
   type PresentedIdentity,
 } from './auth/identity.js'
-import { createAuthEngine, type AuthEngine, type AuthInput, type AuthMethod } from './auth/engine.js'
+import {
+  createAuthEngine,
+  defaultAuthMethods,
+  previewAuthMethods,
+  type AuthEngine,
+  type AuthInput,
+  type AuthMethod,
+} from './auth/engine.js'
+import { createReviewPrompt, type Reviewer, type ReviewRequest } from './authz/reviewPrompt.js'
+import {
+  createVisionDetector,
+  scoreVisionSignals,
+  type VisionDetector,
+  type VisionDetectorOptions,
+  type VisionSignals,
+} from './detection/vision.js'
+import { webMcpSupport } from './detection/webmcp.js'
+import {
+  resolveModelContext,
+  onWebMcpActivity,
+  type ToolAnnotations,
+  type ModelContextTool,
+  type WebMcpActivity,
+} from './tools/modelContext.js'
 import {
   createAgentContextStore,
   type AgentContextStore,
@@ -82,6 +105,8 @@ import {
 import {
   estimateBudget,
   estimateToolTokens,
+  descriptorTokens,
+  modelFacingDescriptor,
   type ToolTokenEstimate,
   type TokenBudgetReport,
 } from './tools/tokenEstimate.js'
@@ -91,6 +116,8 @@ import {
   type WebMcpAdapterOptions,
   type WebMcpToolDescriptor,
   type WebMcpProvider,
+  type WebMcpRegistration,
+  type WebMcpPublishResult,
 } from './tools/webmcpAdapter.js'
 import {
   createTracer,
@@ -108,6 +135,7 @@ import {
   type IntelExporterOptions,
   type IntelSync,
   type IntelSyncOptions,
+  type DashboardConfig,
 } from './observability/index.js'
 
 export {
@@ -123,6 +151,16 @@ export {
   createSignatureLoader,
   createIdentityStore,
   createAuthEngine,
+  defaultAuthMethods,
+  previewAuthMethods,
+  createReviewPrompt,
+  createVisionDetector,
+  scoreVisionSignals,
+  webMcpSupport,
+  resolveModelContext,
+  onWebMcpActivity,
+  descriptorTokens,
+  modelFacingDescriptor,
   createAgentContextStore,
   deriveTrustLevel,
   highestTrust,
@@ -162,6 +200,17 @@ export {
   createDashboardSync,
 }
 export type {
+  Reviewer,
+  ReviewRequest,
+  VisionDetector,
+  VisionDetectorOptions,
+  VisionSignals,
+  ToolAnnotations,
+  ModelContextTool,
+  WebMcpActivity,
+  WebMcpRegistration,
+  WebMcpPublishResult,
+  DashboardConfig,
   AgentronicsClient,
   AuthEngine,
   AuthInput,
@@ -219,4 +268,4 @@ export type {
 
 export const Agentronics = { init, declareAgent, detectAgent }
 
-export const VERSION = '0.1.0'
+export { SDK_VERSION as VERSION } from './version.js'

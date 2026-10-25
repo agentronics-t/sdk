@@ -8,7 +8,8 @@ export const oauth2 = (): AuthMethod => ({
     const verified = await context.verifyToken?.('oauth2', input.oauth2AccessToken)
     return {
       class: input.classHint ?? 'webmcp',
-      trust: input.oauth2Subject ? 'linked' : verified?.trust ?? 'verified',
+      // A user subject only links the session once a verifier has accepted the token.
+      trust: verified ? (input.oauth2Subject && verified.trust !== 'detected' && verified.trust !== 'declared' ? 'linked' : verified.trust) : 'declared',
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'oauth2',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,

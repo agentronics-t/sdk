@@ -21,6 +21,28 @@ const checkChromedriver = (): SignalResult => {
   return { hit: keys.length > 0, weight: 0.5, detail: `window.${keys[0] ?? 'cdc_*'}` }
 }
 
+// Globals that automation frameworks leave on the page.
+const AUTOMATION_GLOBALS = [
+  '__playwright__binding__',
+  '__pwInitScripts',
+  '__puppeteer_evaluation_script__',
+  '_phantom',
+  'callPhantom',
+  '__nightmare',
+  'domAutomation',
+  'domAutomationController',
+  '__selenium_unwrapped',
+  '__webdriver_evaluate',
+  '__driver_evaluate',
+  '__fxdriver_unwrapped',
+]
+
+const checkAutomationGlobals = (): SignalResult => {
+  if (typeof window === 'undefined') return { hit: false, weight: 0.6 }
+  const found = AUTOMATION_GLOBALS.find((k) => k in window)
+  return found ? { hit: true, weight: 0.6, detail: `window.${found}` } : { hit: false, weight: 0.6 }
+}
+
 const checkPlugins = (): SignalResult => {
   if (typeof navigator === 'undefined' || !navigator.plugins) return { hit: false, weight: 0.2 }
   const desktop = /Win|Mac|Linux/.test(navigator.userAgent ?? '')
@@ -60,6 +82,7 @@ const checkPermissions = (): SignalResult => {
 const SIGNALS = {
   webdriver: checkWebdriver,
   chromedriver: checkChromedriver,
+  automationGlobals: checkAutomationGlobals,
   headlessUa: checkHeadlessUa,
   languages: checkLanguages,
   permissions: checkPermissions,

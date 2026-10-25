@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentIdentity } from '@agentronics/protocol'
-import { createAuthEngine } from './engine.js'
+import { createAuthEngine, defaultAuthMethods, previewAuthMethods } from './engine.js'
 import { deriveTrustLevel, highestTrust } from './trustLevel.js'
 
 const detected = (overrides: Partial<AgentIdentity> = {}): AgentIdentity => ({
@@ -46,17 +46,17 @@ describe('auth engine', () => {
     expect(identity?.vendor).toBe('browser-use')
   })
 
-  it('authenticates bearer tokens', async () => {
+  it('an unchecked bearer token is only a claim (declared)', async () => {
     const engine = createAuthEngine()
     const identity = await engine.authenticate({ bearerToken: 'bearer_abcdef12' })
-    expect(identity?.trust).toBe('verified')
+    expect(identity?.trust).toBe('declared')
     expect(identity?.signals.bearer).toBe(true)
   })
 
-  it('authenticates x-agent headers', async () => {
+  it('reads x-agent headers as a claim (the proof is not checked client-side)', async () => {
     const engine = createAuthEngine()
     const identity = await engine.authenticate({ xAgentHeader: 'claude;webmcp;sig_123' })
-    expect(identity?.trust).toBe('verified')
+    expect(identity?.trust).toBe('declared')
     expect(identity?.class).toBe('webmcp')
     expect(identity?.vendor).toBe('claude')
   })
@@ -74,8 +74,11 @@ describe('auth engine', () => {
     expect(verifyToken).toHaveBeenCalledWith('extensionToken', 'ext_abcdef12')
   })
 
-  it('authenticates session-link tokens as linked when a user id is present', async () => {
-    const engine = createAuthEngine()
+  it('links a session only after a verifier accepts the session-link token', async () => {
+    const unchecked = await createAuthEngine().authenticate({ sessionLinkToken: 'ses_abcdef12', linkedUserId: 'user_123' })
+    expect(unchecked?.trust).toBe('declared')
+    const verifyToken = vi.fn(async () => ({ trust: 'verified' as const, vendor: 'site', validUntil: new Date(Date.now() + 60_000).toISOString() }))
+    const engine = createAuthEngine({ context: { verifyToken } })
     const identity = await engine.authenticate({
       sessionLinkToken: 'ses_abcdef12',
       linkedUserId: 'user_123',
@@ -84,8 +87,11 @@ describe('auth engine', () => {
     expect(identity?.signals.linkedUserId).toBe('user_123')
   })
 
-  it('authenticates oauth2 tokens', async () => {
-    const engine = createAuthEngine()
+  it('links an oauth2 user only after the token is verified', async () => {
+    const unchecked = await createAuthEngine().authenticate({ oauth2AccessToken: 'oauth_abcdef12', oauth2Subject: 'user_123' })
+    expect(unchecked?.trust).toBe('declared')
+    const verifyToken = vi.fn(async () => ({ trust: 'verified' as const, vendor: 'google', validUntil: new Date(Date.now() + 60_000).toISOString() }))
+    const engine = createAuthEngine({ context: { verifyToken } })
     const identity = await engine.authenticate({
       oauth2AccessToken: 'oauth_abcdef12',
       oauth2Subject: 'user_123',
@@ -116,7 +122,7 @@ describe('auth engine', () => {
       subject: 'auth0|user-42',
       protocol: 'sso' as const,
     }))
-    const engine = createAuthEngine({ context: { verifyToken }, onTrace })
+    const engine = createAuthEngine({ methods: [...defaultAuthMethods(), ...previewAuthMethods()], context: { verifyToken }, onTrace })
     await engine.authenticate({ ssoIdToken: 'eyJ.abc.def' })
     expect(onTrace).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -137,7 +143,7 @@ describe('auth engine', () => {
       subject: 'spiffe://acme-prod.svc.id.goog/resources/vertex/agent-42',
       protocol: 'google-agent' as const,
     }))
-    const engine = createAuthEngine({ context: { verifyToken }, onTrace })
+    const engine = createAuthEngine({ methods: previewAuthMethods(), context: { verifyToken }, onTrace })
     await engine.authenticate({ spiffeJwt: 'eyJ.spiffe' })
     expect(onTrace).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -155,12 +161,40 @@ describe('auth engine', () => {
       subject: 'spiffe://prod.acme.example/payments/web-fe',
       protocol: 'spiffe' as const,
     }))
-    const engine = createAuthEngine({ context: { verifyToken }, onTrace })
+    const engine = createAuthEngine({ methods: previewAuthMethods(), context: { verifyToken }, onTrace })
     await engine.authenticate({ spiffeJwt: 'eyJ.spiffe' })
     expect(onTrace).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({ protocol: 'spiffe' }),
       })
     )
+  })
+
+  it('keeps SSO, SPIFFE and mTLS off by default (coming later)', () => {
+    const names = createAuthEngine().methods()
+    expect(names).not.toContain('sso')
+    expect(names).not.toContain('spiffe')
+    expect(names).not.toContain('mtls')
+    expect(previewAuthMethods().map((m) => m.name)).toEqual(['sso', 'spiffe', 'mtls'])
+  })
+})
+
+describe("compat: '0.6' (upgrade path)", () => {
+  it('restores pre-0.7 trust for unverified tokens and turns the preview methods back on', async () => {
+    const engine = createAuthEngine({ compat: '0.6' })
+    expect(engine.methods()).toEqual(expect.arrayContaining(['sso', 'spiffe', 'mtls']))
+    expect((await engine.authenticate({ bearerToken: 'bearer_abcdef12' }))?.trust).toBe('verified')
+    expect((await engine.authenticate({ oauth2AccessToken: 'oauth_abcdef12', oauth2Subject: 'user_1' }))?.trust).toBe('linked')
+    expect((await engine.authenticate({ xAgentHeader: 'claude;webmcp;sig_123' }))?.trust).toBe('verified')
+    expect((await engine.authenticate({ ssoIdToken: 'eyJ.abc.def' }))?.signals.compat).toBe('0.6')
+  })
+
+  it('reports the first unverified credential once, so the upgrade is discoverable', async () => {
+    const onUnverifiedToken = vi.fn()
+    const engine = createAuthEngine({ onUnverifiedToken })
+    await engine.authenticate({ bearerToken: 'bearer_abcdef12' })
+    await engine.authenticate({ bearerToken: 'bearer_abcdef12' })
+    expect(onUnverifiedToken).toHaveBeenCalledOnce()
+    expect(onUnverifiedToken).toHaveBeenCalledWith('bearer')
   })
 })

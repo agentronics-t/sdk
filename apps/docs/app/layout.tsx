@@ -1,28 +1,18 @@
 import type { ReactNode } from 'react'
 import { RootProvider } from 'fumadocs-ui/provider'
-import { Geist, JetBrains_Mono } from 'next/font/google'
+import { Funnel_Display, Funnel_Sans, Martian_Mono } from 'next/font/google'
 import 'fumadocs-ui/style.css'
 import './theme.css'
 
-// Brand typography (matches the marketing site + dashboard): Geist for UI/body,
-// JetBrains Mono for code. Exposed as --font-sans / --font-mono, consumed by
-// theme.css and @agentronics/theme tokens.
-const geist = Geist({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-})
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-mono',
-  display: 'swap',
-})
+// Brand typography (same as agentronics.dev and the console): Funnel Display
+// for headings, Funnel Sans for text, Martian Mono for code and labels.
+const display = Funnel_Display({ subsets: ['latin'], variable: '--font-display', display: 'swap' })
+const sans = Funnel_Sans({ subsets: ['latin'], variable: '--font-sans', display: 'swap' })
+const mono = Martian_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' })
 
 export const metadata = {
   title: 'Agentronics Docs',
-  description: 'Universal governance layer for agent-surfable websites.',
+  description: 'Make your website ready for AI agents: the Agentronics SDK for WebMCP tools, agent detection, auth, rules and observability.',
   icons: {
     icon: '/docs-static/icon.svg',
     shortcut: '/docs-static/icon.svg',
@@ -35,7 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geist.variable} ${jetbrainsMono.variable}`}
+      className={`${display.variable} ${sans.variable} ${mono.variable}`}
     >
       <body>
         {/* Light by default with a working theme switcher, matching the brand

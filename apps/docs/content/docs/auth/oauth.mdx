@@ -1,0 +1,80 @@
+---
+title: OAuth 2.1
+description: Verify agent access tokens — app-only or acting for a user — including DPoP-bound tokens and MCP-style discovery.
+---
+
+# OAuth 2.1
+
+OAuth is how an agent gets permission to act: either as itself (client credentials), or **on behalf of a user** who signed in and consented (authorization code — the flow the MCP authorization spec uses — or token exchange). The SDK verifies JWT access tokens from the issuers you configure.
+
+## Use it
+
+```ts
+import { createAgentAuth } from '@agentronics/sdk/server'
+
+const auth = createAgentAuth({
+  oauth2: {
+    issuer: 'https://auth.shop.example',
+    audience: 'https://shop.example',      // your resource indicator (RFC 8707)
+    requiredScopes: ['agent:browse'],      // optional
+    // jwksUri defaults to <issuer>/.well-known/jwks.json
+  },
+})
+```
+
+Several issuers — your own auth server plus a partner's — are an array:
+
+```ts
+oauth2: [
+  { issuer: 'https://auth.shop.example', audience: 'https://shop.example' },
+  { issuer: 'https://idp.partner.example', audience: 'https://shop.example' },
+]
+```
+
+Only tokens whose `iss` matches a configured issuer are treated as agent credentials, so your users' own session JWTs pass through untouched.
+
+## App-only vs. on behalf of a user
+
+| Token | Agent id | `onBehalfOf` | Trust |
+|---|---|---|---|
+| Client credentials (`client_id`, no user) | `oauth2:<client_id>` | — | `verified` |
+| Delegated (`client_id` / `azp` + a different `sub`) | `oauth2:<client_id>` | `{ sub, email?, name? }` | `linked` |
+| Token exchange (RFC 8693 `act` claim) | `oauth2:<act.client_id or act.sub>` | `{ sub }` | `linked` |
+
+```ts
+const result = await auth.authenticate(request)
+if (result.status === 'verified' && result.agent.onBehalfOf) {
+  // Apply the user's permissions to what the agent may do.
+}
+```
+
+Optional claims `agent_name` / `client_name` and `agent_vendor` fill in the agent's display name and vendor.
+
+## DPoP-bound tokens (RFC 9449)
+
+A token with a `cnf.jkt` claim is bound to the agent's key. The agent must send it as `Authorization: DPoP <token>` with a `DPoP` proof header; the SDK checks the proof's signature, key thumbprint, `htm`, `htu`, `iat`, `ath` and that the `jti` hasn't been used before. A bound token sent as a plain bearer token is refused (`oauth2:dpop_proof_required`). Set `requireDpop: true` on an issuer to refuse unbound tokens too.
+
+## Let agents discover how to get a token
+
+MCP clients find your authorization server through protected-resource metadata (RFC 9728). Serve it, and point agents at it from routes that need a token:
+
+```ts
+import { PROTECTED_RESOURCE_PATH, protectedResourceMetadata, oauthChallenge } from '@agentronics/sdk/server'
+
+// GET /.well-known/oauth-protected-resource
+export const GET = () =>
+  Response.json(
+    protectedResourceMetadata({
+      resource: 'https://shop.example',
+      authorizationServers: ['https://auth.shop.example'],
+      scopesSupported: ['agent:browse', 'agent:buy'],
+    })
+  )
+
+// On a route that requires a token (your choice — Agentronics never blocks on its own):
+return new Response(null, { status: 401, headers: { 'www-authenticate': oauthChallenge('https://shop.example', { scope: 'agent:buy' }) } })
+```
+
+## Failure reasons
+
+`oauth2:invalid_token:<jose code>`, `oauth2:missing_scopes:<list>`, `oauth2:dpop_*` (`dpop_htu_mismatch`, `dpop_replayed`, `dpop_stale`, …), `oauth2:token_has_no_client_id`. Opaque (non-JWT) access tokens aren't supported — use an issuer that mints JWT access tokens.

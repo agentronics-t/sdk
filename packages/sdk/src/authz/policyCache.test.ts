@@ -31,7 +31,7 @@ describe('policy cache', () => {
     expect(snapshot.policies).toHaveLength(1)
     expect(snapshot.etag).toBe('v1')
     expect(fetcher).toHaveBeenCalledWith(
-      'https://gateway.example/v1/sites/site_123/policies',
+      'https://gateway.example/v1/pub/sites/site_123/policies',
       expect.objectContaining({
         headers: expect.objectContaining({
           authorization: 'Bearer agtx_pk_demo_1234567890',

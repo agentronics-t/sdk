@@ -22,17 +22,25 @@ export interface TokenBudgetReport {
   perTool: ToolTokenEstimate[]
 }
 
+/**
+ * What an agent actually receives for a tool — the fields registered with
+ * WebMCP (`name`, `title`, `description`, `inputSchema`, `annotations`).
+ * Policy, version and grouping stay on the site and cost the agent nothing.
+ */
+export const modelFacingDescriptor = (tool: Pick<GovernedTool, 'name' | 'title' | 'description' | 'inputSchema' | 'annotations'>) => ({
+  name: tool.name,
+  ...(tool.title ? { title: tool.title } : {}),
+  description: tool.description ?? tool.name,
+  ...(tool.inputSchema ? { inputSchema: tool.inputSchema } : {}),
+  ...(tool.annotations ? { annotations: tool.annotations } : {}),
+})
+
+/** ≈ characters / 4 of the model-facing descriptor. */
+export const descriptorTokens = (tool: Parameters<typeof modelFacingDescriptor>[0]): number =>
+  Math.ceil(stableStringify(modelFacingDescriptor(tool)).length / APPROX_CHARS_PER_TOKEN)
+
 export const estimateToolTokens = (tool: GovernedTool): ToolTokenEstimate => {
-  const descriptor = {
-    name: tool.name,
-    version: tool.version ?? null,
-    group: tool.group ?? null,
-    description: tool.description ?? null,
-    inputSchema: tool.inputSchema ?? null,
-    authz: tool.authz ?? null,
-    rateLimit: tool.rateLimit ?? null,
-  }
-  const characters = stableStringify(descriptor).length
+  const characters = stableStringify(modelFacingDescriptor(tool)).length
   return { name: tool.name, characters, tokens: Math.ceil(characters / APPROX_CHARS_PER_TOKEN) }
 }
 

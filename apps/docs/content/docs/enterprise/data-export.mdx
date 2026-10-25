@@ -1,62 +1,36 @@
 ---
 title: Data export
-description: How audit logs and traces leave the gateway — JSON/CSV and webhooks via the API.
+description: Get your agent traces out — stream them to your own warehouse as they happen, or download them from the console.
 ---
 
 # Data export
 
-Three things customers ask for: a copy of their audit log, a copy of their raw traces, and a webhook stream to their own warehouse. All three are available through the gateway API, covered below.
+## Stream every event to your own systems (any plan)
+
+Every trace passes through your server on its way to Agentronics — the [trace relay](/docs/observability#sending-traces-to-the-console) and the server auth middleware both run there. Fan them out as they pass:
+
+```ts
+// app/api/agentronics/route.ts
+import { createTraceRelay } from '@agentronics/sdk/server'
+
+export const POST = createTraceRelay({
+  url: process.env.AGENTRONICS_API_URL!,
+  ingestKey: process.env.AGENTRONICS_INGEST_KEY!,
+  siteId: 'shop',
+  forward: (events) => warehouse.insert('agent_events', events), // or a queue, or a webhook
+})
+```
+
+`forward` runs alongside the console export; if it fails, the console still gets the batch, and vice versa. For server-side events, add your own exporter next to `createDashboardExporter` — any object with `export(events)` works.
+
+## Download raw traces (Enterprise)
+
+On the console's **Observability** page, filter to what you need (event type, outcome, agent type, tool, a single session) and click **Export CSV**. You get up to 50,000 events with time, site, session, type, outcome, tool, agent, trust, auth method, page, latency and error. The file is formula-safe for spreadsheets.
+
+## Retention
+
+Raw events are kept for your plan's window (7 / 30 / 90 days, custom on Enterprise). Daily rollups behind the charts are kept longer. Stream with `forward` if you need everything indefinitely.
 
 ## Audit log
 
-Every dashboard mutation writes a row to the org's audit table. The exporter route returns those rows in either JSON or CSV.
-
-```bash
-# JSON
-curl -X POST https://gateway.agentronics.dev/v1/audit/export \
-  -H 'authorization: Bearer agtx_sk_...' \
-  -H 'content-type: application/json' \
-  -d '{}'
-
-# CSV (browser will download attachment)
-curl -X POST https://gateway.agentronics.dev/v1/audit/export \
-  -H 'authorization: Bearer agtx_sk_...' \
-  -H 'content-type: application/json' \
-  -d '{ "format": "csv" }' > audit.csv
-```
-
-The endpoint is scoped to the calling org — there is no admin-level "export everything" path. CSV columns are stable: `id, orgId, actor, action, target, metadata, occurredAt`.
-
-## Traces
-
-`GET /v1/traces` paginates by cursor, filters by class/type/time:
-
-```bash
-curl 'https://gateway.agentronics.dev/v1/traces?limit=200&type=tool.executed&since=2026-05-01T00:00:00Z' \
-  -H 'authorization: Bearer agtx_sk_...'
-```
-
-Response: `{ events: TraceEvent[], nextCursor: string | null }`. Pass `nextCursor` back as `?cursor=` to page.
-
-Use `GET /v1/metrics?since=...` for pre-aggregated counts (per type, per outcome, per hour). The SDK already hourly-rolls up the trace stream so analytics queries don't pay the raw cost.
-
-## Webhooks
-
-Schedule a delivery from your dashboard or via API:
-
-```bash
-curl -X POST https://gateway.agentronics.dev/v1/webhooks/test \
-  -H 'authorization: Bearer agtx_sk_...' \
-  -H 'content-type: application/json' \
-  -d '{ "url": "https://your-host.example.com/agentronics", "payload": { "ping": true } }'
-```
-
-The cron-driven dispatcher drains the pending queue every minute. Failed deliveries retry up to 3 times with backoff before being dead-lettered. Dead-lettered deliveries stay queryable via `GET /v1/webhooks` so you can inspect what didn't make it.
-
-## Available channels
-
-| Channel | Notes |
-|---|---|
-| `POST /v1/audit/export` (JSON / CSV) | Per-org audit rows; stable columns. |
-| `GET /v1/traces` (paginated) | Cursor-based, 200 max per page. |
-| `POST /v1/webhooks/test` + cron drain | 3 retries → dead-letter, queryable via `GET /v1/webhooks`. |
+An export of console changes (rules, keys, approved descriptions) is available to Enterprise customers on request while the self-serve export is built.

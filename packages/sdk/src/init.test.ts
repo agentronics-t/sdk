@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { init } from './init.js'
 
 describe('init', () => {
@@ -26,7 +26,7 @@ describe('init', () => {
         publishableKey: 'agtx_pk_demo_1234567890',
         gatewayUrl: 'https://evil.example.com',
       })
-    ).toThrow(/does not support custom gateway URLs/)
+    ).toThrow(/does not support custom API URLs/)
   })
 
   it('rejects a malformed gateway URL', () => {
@@ -98,7 +98,7 @@ describe('init', () => {
   it('exposes the auth engine through the client', async () => {
     const client = init({ publishableKey: 'agtx_pk_demo_1234567890' })
     const identity = await client.authenticate({ bearerToken: 'bearer_abcdef12' })
-    expect(identity?.trust).toBe('verified')
+    expect(identity?.trust).toBe('declared')
     expect(client.auth.methods()).toContain('bearer')
   })
 
@@ -289,5 +289,59 @@ describe('init', () => {
     handle.uninstall()
     expect(document.querySelector('meta[name="agent-context-version"]')).toBeNull()
     expect(document.getElementById('agentronics-memory-overlay')).toBeNull()
+  })
+})
+
+describe('Agentronics API (replaces the retired gateway)', () => {
+  it('calls https://api.agentronics.dev by default and maps the old gateway URL to it', () => {
+    expect(init({ publishableKey: 'agtx_pk_demo_1234567890' }).gatewayUrl).toBe('https://api.agentronics.dev')
+    expect(init({ publishableKey: 'agtx_pk_demo_1234567890', gatewayUrl: 'https://gateway.agentronics.dev' }).gatewayUrl).toBe('https://api.agentronics.dev')
+  })
+
+  it('syncConfig() pulls rules, approved descriptions and site memory with the publishable key', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          policies: [{ id: 'console:1', tool: 'checkout', minTrust: 'verified', allowedClasses: [], decision: 'review' }],
+          toolDescriptions: { search: 'Search products.' },
+          siteMemory: { siteMap: { pages: [{ path: '/cart', purpose: 'Review the cart' }] } },
+        }),
+        { status: 200 }
+      )
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const client = init({ publishableKey: 'agtx_pk_demo_1234567890', siteId: 'shop', autoDetect: false })
+      const config = await client.syncConfig()
+      const [url, reqInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+      expect(url).toBe('https://api.agentronics.dev/v1/pub/sites/shop/config')
+      expect((reqInit.headers as Record<string, string>).authorization).toBe('Bearer agtx_pk_demo_1234567890')
+      expect(client.listPolicies()[0]).toMatchObject({ tool: 'checkout', decision: 'review' })
+      expect(config.toolDescriptions).toEqual({ search: 'Search products.' })
+      expect(client.siteMemory.get('siteMap.pages')).toEqual([{ path: '/cart', purpose: 'Review the cart' }])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe("init compat: '0.6'", () => {
+  it('runs review rules without asking and trusts unverified tokens, with a deprecation warning', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const client = init({
+        publishableKey: 'agtx_pk_demo_1234567890',
+        autoDetect: false,
+        compat: '0.6',
+        policies: [{ id: 'r', tool: 'pay', minTrust: 'detected', allowedClasses: [], decision: 'review' }],
+        tools: [{ name: 'pay', execute: () => 'paid' }],
+      })
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("compat: '0.6' is on"))
+      const agent = { class: 'webmcp' as const, trust: 'detected' as const, confidence: 1, vendor: null, userAgent: null, detectionVersion: 't', signals: {} }
+      await expect(client.tools.execute('pay', {}, agent)).resolves.toBe('paid')
+      expect((await client.authenticate({ bearerToken: 'bearer_abcdef12' }))?.trust).toBe('verified')
+    } finally {
+      warn.mockRestore()
+    }
   })
 })

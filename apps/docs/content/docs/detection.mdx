@@ -1,94 +1,76 @@
 ---
 title: Detection
-description: How the Agentronics SDK identifies which kind of agent — if any — is on the page.
+description: How the Agentronics SDK spots agents on the page — self-declared, browser automation, vision models, WebMCP and crawlers.
 ---
 
 # Detection
 
-The SDK identifies four classes of agent. They are not symmetric — some are exact-match, some are heuristic, some are not detectable at all from the page. Being upfront about that asymmetry is the most important thing on this page.
+Detection labels traffic; it never blocks it. The SDK uses five sources, from strongest to weakest:
 
-| Class | How we detect | Confidence |
-|---|---|---|
-| **WebMCP** | `navigator.modelContext` is set by the agent's browser/extension | Exact — `confidence: 1` |
-| **Crawler** | `navigator.userAgent` matches a known AI/search bot signature | Signature — `confidence: 0.9` (spoofable) |
-| **DOM-driver** | A weighted bag of automation signals (Playwright, Puppeteer, Selenium…) | Heuristic — `confidence: 0.0–1.0` |
-| **Screenshot model** | Cannot be detected client-side. Use `declareAgent()`. | Declared — `trust: 'declared' \| 'verified'` |
+| Source | Class | How | Confidence |
+|---|---|---|---|
+| **Self-declaration** | any | The agent names itself (`presentIdentity()`, `declareAgent()`, an `X-Agent` header) | `trust: 'declared'` — a claim |
+| **WebMCP activity** | `webmcp` | An agent activates or calls one of your tools through `document.modelContext` | Exact — `confidence: 1` |
+| **Vision behaviour** | `screenshot` | How the visitor clicks and types (see below) | Scored, `0.6–1` |
+| **DOM / headless** | `dom` | Automation fingerprints — `navigator.webdriver`, ChromeDriver / Playwright / Puppeteer globals, headless UA | Scored, `0.4–1` |
+| **Crawler User-Agent** | `crawler` | `navigator.userAgent` matches a known bot | `0.9` — spoofable; verify on the server |
 
-## Running detection
+`init()` runs detection automatically (`autoDetect`, on by default) and keeps the result in `client.agentContext`, so every tool call is attributed without you passing identity around. Call `client.detect()` to re-run it.
 
 ```ts
-import { Agentronics } from '@agentronics/sdk'
-
-const client = Agentronics.init({ publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY! })
-
 const identity = await client.detect()
-// → { class: 'webmcp', trust: 'detected', confidence: 1, vendor: 'claude-extension', … }
-// or null if no agent fires above threshold
+// → { class: 'dom', trust: 'detected', confidence: 0.72, signals: { webdriver: {…}, automationGlobals: {…} } }
+// or null — a human, or an agent that hasn't shown itself
 ```
 
-`detect()` runs WebMCP first (with a short poll for late-injecting extensions), then a **known-crawler User-Agent match**, then DOM heuristics. The first class that matches wins.
+## WebMCP agents
+
+`document.modelContext` exists for **every** visitor of a WebMCP-capable browser (Chrome and Edge origin trials, ChatGPT Desktop, …), so its presence alone says nothing about an agent. The SDK reports a WebMCP agent once one *acts*: a `toolactivated` event, or a call to a tool you published with `publishToWebMcp()`. From then on the session is attributed to that agent (unless a stronger, declared or verified identity is already in place).
+
+`webMcpSupport()` tells you whether the page can serve tools at all: `'document'`, `'navigator'` (the old alias, removed in Chrome 152), `'legacy'` (old polyfills) or `null`.
+
+## Vision-model agents
+
+Computer-use agents (ChatGPT agent, Claude computer use, Gemini computer use, …) look at screenshots and drive a real browser with synthetic mouse and keyboard input. They often pass DOM checks, but they interact differently from people:
+
+- **teleport clicks** — a click with no pointer movement before it;
+- **centre clicks** — clicks within a pixel or two of an element's exact centre, again and again;
+- **metronome typing** — key intervals with almost no variance, or text inserted with no key presses;
+- **no hover, no wheel** — clicks and scroll jumps with no mousemove or wheel events between;
+- **VM-shaped viewport** — exact sandbox sizes such as 1024×768 or 1280×800 (a weak signal on its own).
+
+The monitor scores these over a short window and reports a `screenshot` agent only when several agree after at least three interactions. It reads event timing and coordinates — never key values or text — and ignores synthetic (`isTrusted: false`) events, which are DOM automation instead.
+
+```ts
+Agentronics.init({
+  publishableKey,
+  visionDetection: { threshold: 0.7, minInteractions: 4 }, // or false to turn it off
+})
+
+client.vision?.score()   // live 0–1 score
+client.vision?.signals() // { clicks, teleportClicks, centreClicks, keyIntervalCv, … }
+```
+
+## DOM / headless
+
+A weighted bag of signals: `navigator.webdriver`, ChromeDriver's `cdc_*` globals, Playwright / Puppeteer / Selenium / PhantomJS / Nightmare globals, a headless User-Agent, empty `navigator.languages` or plugins on desktop, a Chrome UA without `window.chrome`. Raise `dom.threshold` (default `0.4`) to be stricter.
+
+## Crawlers
+
+`detectCrawler()` matches `navigator.userAgent` against AI crawlers (`GPTBot`, `OAI-SearchBot`, `ChatGPT-User`, `Claude-User`, `Claude-SearchBot`, `ClaudeBot`, `PerplexityBot`, `Perplexity-User`, `Google-Extended`, `Applebot-Extended`, `Amazonbot`, `Bytespider`, `CCBot`, `Meta-ExternalAgent`, `cohere-ai`) and search crawlers (`Googlebot`, `Bingbot`, `DuckDuckBot`, `YandexBot`, `Baiduspider`, `Applebot`). In the browser it only sees crawlers that run JavaScript and can't tell a real GPTBot from a spoofed one — [verify crawlers on the server](/docs/auth/verified-crawlers) with their published IP ranges.
 
 ## Tuning
 
 ```ts
 await client.detect({
-  webmcp:  { pollMs: 500 },    // 0 to skip the poll, false to skip WebMCP entirely
-  crawler: { confidence: 0.9 },// false to skip crawler matching
-  dom:     { threshold: 0.4 }, // raise to be stricter, false to skip DOM heuristics
+  webmcp: { pollMs: 500 },     // wait for WebMCP activity; 0 = check once; false = skip
+  crawler: { confidence: 0.9 }, // false = skip
+  dom: { threshold: 0.4 },     // false = skip
 })
 ```
 
-## Crawlers
+## What we deliberately don't do
 
-Crawlers are AI and search bots that fetch your pages — OpenAI's `GPTBot`, Anthropic's `ClaudeBot`, `PerplexityBot`, `Googlebot`, `Bingbot`, and friends. The SDK identifies them by matching `navigator.userAgent` against a signature table:
-
-```ts
-import { detectCrawler } from '@agentronics/sdk'
-
-const id = detectCrawler()
-// → { class: 'crawler', trust: 'detected', confidence: 0.9,
-//     vendor: 'GPTBot', signals: { matched: 'GPTBot', category: 'ai', ua } }
-// or null
-```
-
-`detectCrawler` is also wired into the `detect()` pipeline (after WebMCP, before DOM), so you usually don't call it directly. Bring your own signatures for first-party crawlers:
-
-```ts
-detectCrawler({
-  signatures: [
-    { name: 'AcmeBot', category: 'ai', pattern: /AcmeInternalCrawler/i },
-  ],
-})
-```
-
-The bundled table covers AI crawlers (`GPTBot`, `OAI-SearchBot`, `ChatGPT-User`, `ClaudeBot`, `anthropic-ai`, `PerplexityBot`, `Google-Extended`, `Applebot-Extended`, `Amazonbot`, `Bytespider`, `CCBot`, `Meta-ExternalAgent`, `cohere-ai`) and search crawlers (`Googlebot`, `Bingbot`, `DuckDuckBot`, `YandexBot`, `Baiduspider`, `Applebot`).
-
-### Two caveats — read these
-
-- **User-Agent is self-reported and spoofable.** A match is high-confidence, not proof, so we report `confidence: 0.9`, never `1`. Don't gate a security-critical decision on a crawler match alone — pair it with `declareAgent()` + a verification token if you need trust.
-- **Client-side detection only sees JS-executing crawlers.** Most crawlers fetch your HTML and never run the SDK, so they are invisible to `detectCrawler()`. Comprehensive crawler coverage needs **server/edge User-Agent inspection** — that belongs to a future edge product, not v0.1. Treat client-side crawler detection as a best-effort signal for the bots that do render.
-
-## Agents declaring themselves
-
-Screenshot agents — and any agent that wants higher trust than detection alone provides — should call `declareAgent()`:
-
-```ts
-import { declareAgent } from '@agentronics/sdk'
-
-const id = declareAgent({
-  class: 'screenshot',
-  vendor: 'browser-use',
-  verificationToken: '<token from your verification endpoint>',
-})
-// → trust: 'verified' if a token is supplied, otherwise 'declared'
-```
-
-`verified` requires the gateway to validate the token against the customer's configured verification endpoint. That validation lands with the gateway in Phase 8.
-
-## What we deliberately do **not** do
-
-- **No fingerprinting beyond detection.** No canvas hashes, no audio context probes, no font enumeration.
-- **No silent retries to defeat anti-detection tooling.** If a sophisticated DOM-driver scrubs `navigator.webdriver`, it passes as human and that's the right answer for v0.1.
-- **No server-side header inspection in v0.1.** That belongs to a future edge product — and it's exactly where comprehensive crawler detection will live.
-
-See `research/phase-0.5-detection-spike.md` in the repo for the full methodology, signal weights, and decision log.
+- No canvas, audio or font fingerprinting, and no reading what visitors type.
+- No retries to defeat anti-detection tooling. An agent that hides well browses as a human — and is still welcome.
+- Detection never blocks. Use [authorization rules](/docs/authorization) to decide what each kind of agent may call.

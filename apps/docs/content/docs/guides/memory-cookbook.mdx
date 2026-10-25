@@ -122,7 +122,7 @@ function CheckoutPage({ cartTotal }: { cartTotal: number }) {
 
 ## 5. Publishing the well-known endpoint
 
-Agentronics serves the well-known JSON via the gateway, but most enterprises expose it on their own domain so unsupported agents can fetch it without involving us.
+Expose the well-known JSON on your own domain so any agent can fetch it without an SDK. The quickest way is `createAgentContextHandler({ sync })` from `@agentronics/sdk/server`, which serves the snapshot you pushed to the console; or serialise your own snapshot as below.
 
 ```ts
 import { serializeWellKnownContext } from '@agentronics/sdk'

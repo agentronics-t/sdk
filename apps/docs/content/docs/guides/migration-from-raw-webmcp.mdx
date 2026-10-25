@@ -1,37 +1,40 @@
 ---
 title: Migrating from raw WebMCP
-description: How to add Agentronics to a site that already publishes WebMCP tools via navigator.modelContext.
+description: Add Agentronics to a site that already registers WebMCP tools with document.modelContext.
 ---
 
 # Migrating from raw WebMCP
 
-If your site already calls `navigator.modelContext.registerTool(...)` directly, Agentronics is meant to wrap that surface — not replace it. You keep your existing tool implementations and gain detection, auth, authorization, site memory, and observability around them.
+If your site already calls `document.modelContext.registerTool(...)`, Agentronics wraps that surface — it doesn't replace your tools. You keep your implementations and gain detection, authentication, authorization (including *review*), per-tool status, procedural memory and observability.
 
-This guide assumes you've read [Getting Started](/docs/getting-started). It covers the three patterns you'll hit when porting an existing WebMCP site.
-
-## What changes, what doesn't
+## What changes
 
 | Stays the same | Now goes through Agentronics |
 |---|---|
-| Your `inputSchema`, `description`, `annotations` | The `execute` callback runs after policy evaluation |
-| `client.requestUserInteraction()` calls inside `execute` | Detection, auth normalization, trace export |
-| The shape of your tool results (`content`, `isError`) | Tool surfacing (which tools are exposed, when) |
-| WebMCP-native agents continue to work unchanged | DOM and screenshot agents are now governed too |
+| `name`, `title`, `description`, `inputSchema`, `annotations` | Each call is checked against your rules first (allow / review / deny) |
+| Your `execute` logic and return values | The session is attributed to the agent that called |
+| WebMCP agents keep working unchanged | Registration status and call outcomes are traced to the console |
+| | Approved descriptions from the console can replace the text agents see |
 
-## Pattern 1 — direct registerTool replacement
+## Pattern 1 — move registrations into the SDK
 
 Before:
 
 ```ts
-navigator.modelContext.registerTool({
-  name: 'cart.add',
-  description: 'Add a product to the cart.',
-  inputSchema: { type: 'object', properties: { productId: { type: 'string' } } },
-  async execute({ productId }) {
-    addToCart(productId)
-    return { content: [{ type: 'text', text: 'ok' }] }
+const controller = new AbortController()
+await document.modelContext.registerTool(
+  {
+    name: 'add_to_cart',
+    title: 'Add to cart',
+    description: 'Add a product to the cart.',
+    inputSchema: { type: 'object', properties: { productId: { type: 'string' } }, required: ['productId'] },
+    async execute({ productId }, { signal }) {
+      await addToCart(productId, { signal })
+      return { ok: true }
+    },
   },
-})
+  { signal: controller.signal }
+)
 ```
 
 After:
@@ -39,87 +42,58 @@ After:
 ```ts
 import { Agentronics } from '@agentronics/sdk'
 
-const client = Agentronics.init({
-  publishableKey: 'agtx_pk_live_…',
-  siteId: 'shop-acme-com',
-})
+const client = Agentronics.init({ publishableKey: 'agtx_pk_live_…', siteId: 'shop', policies, toolDescriptions })
 
 client.registerTool({
-  name: 'cart.add',
+  name: 'add_to_cart',
+  title: 'Add to cart',
   description: 'Add a product to the cart.',
-  inputSchema: { type: 'object', properties: { productId: { type: 'string' } } },
-  authz: { policy: 'cart.write', minTrust: 'verified' },
-  async execute({ productId }, _wmcpClient, context) {
-    // context.agent / context.auth / context.trace are injected by the SDK
-    addToCart(productId)
-    return { content: [{ type: 'text', text: 'ok' }] }
+  inputSchema: { type: 'object', properties: { productId: { type: 'string' } }, required: ['productId'] },
+  async execute({ productId }, { identity, signal }) {
+    await addToCart(productId, { signal })
+    return { ok: true }
   },
 })
 
-client.publishToWebMcp() // mirrors surfaced tools to navigator.modelContext
+const { registrations } = client.publishToWebMcp()
+// → [{ name: 'add_to_cart', status: 'callable' }]
 ```
 
-`publishToWebMcp` is idempotent and re-runs every time the surfaced set changes (trust level, progression stage, etc.). You don't need to call it on every render — the React adapter handles it for you.
+The SDK owns the `AbortController`s: it unregisters and re-registers when the set of tools a given agent may see changes. Drop your own `registerTool` calls once a tool moves over.
 
-## Pattern 2 — keep the registry, add governance only
+## Pattern 2 — keep your registrations, add a policy check
 
-If you have a complicated registration setup you'd rather not rewrite, wrap each `execute` in `client.evaluate(...)`:
+If your registration code is hard to move, call `evaluate()` inside `execute`:
 
 ```ts
-navigator.modelContext.registerTool({
-  name: 'cart.add',
+await document.modelContext.registerTool({
+  name: 'add_to_cart',
   description: '…',
-  inputSchema: { … },
   async execute(input) {
-    const decision = await client.evaluate('cart.add')
-    if (!decision.allow) {
-      return { content: [{ type: 'text', text: decision.reason ?? 'denied' }], isError: true }
-    }
-    addToCart(input.productId)
-    client.notifyToolInvoked('cart.add') // counts toward progression + traces
-    return { content: [{ type: 'text', text: 'ok' }] }
+    const decision = await client.evaluate('add_to_cart')
+    if (decision.decision === 'deny') throw new Error(decision.reason)
+    // decision.decision === 'review': ask the person yourself before continuing
+    await addToCart(input.productId)
+    client.notifyToolInvoked('add_to_cart')
+    return { ok: true }
   },
 })
 ```
 
-This loses tool surfacing and the deny overlay but gives you policy enforcement and traces with one extra call per tool.
+You keep policy enforcement and traces, but lose automatic review prompts, per-tool status, approved descriptions and identity-based surfacing.
 
-## Pattern 3 — DOM-agent governance only
+## Pattern 3 — agents that click instead of calling tools
 
-Sites that don't publish WebMCP tools at all but are visited by Claude Chrome / Operator / Comet only need the DOM enforcer:
+Browser-automation and vision agents use your UI directly. Mark the controls and install the enforcer:
 
-```ts
-const client = Agentronics.init({ publishableKey: 'agtx_pk_live_…', siteId: 'shop' })
-
-client.setPolicies([
-  { tool: 'cart.add', selector: 'button.add-to-cart', minTrust: 'verified' },
-  { tool: 'checkout', selector: 'button.checkout', minTrust: 'linked' },
-])
-
+```tsx
 client.installDomEnforcer()
-client.installMemoryDelivery({ metaTags: true })
+
+<button data-agentronics-tool="checkout">Pay now</button>
 ```
 
-Now any DOM agent that clicks a matching selector is evaluated against the policy and either allowed through, denied with the overlay, or rate-limited.
+Rules for `checkout` now apply to clicks from those agents too.
 
-## Site memory parity
+## Declarative forms
 
-The raw WebMCP path gives agents nothing — they have to screenshot or read your DOM to learn your structure. Agentronics ships the [/.well-known/agent-context.json](/docs/concepts/site-memory) endpoint plus a synthetic `getSiteContext` tool you can register in one line:
-
-```ts
-import { createWebMcpContextTool } from '@agentronics/sdk'
-
-client.registerTool(createWebMcpContextTool({ store: client.siteMemory }))
-```
-
-DOM and screenshot agents pick up the same context via `<meta name="agentronics:site-memory">` tags installed by `installMemoryDelivery({ metaTags: true })`.
-
-## What to remove
-
-Once you've migrated, the following can be deleted:
-
-- Direct `navigator.modelContext.registerTool` calls — `publishToWebMcp` owns that surface.
-- Hand-rolled detection (UA sniffing, extension probes) — the detector library is updated server-side.
-- Per-tool error returns for unauthorized agents — the policy engine handles that uniformly.
-
-Anything you previously logged about agent activity is now in the trace stream — see [Observability](/docs/observability).
+The declarative API (`<form toolname tooldescription>`) was removed from the WebMCP spec in October 2026 and is only an explainer now. If you used it, register those forms as imperative tools that fill and submit the form — Agent Nick generates exactly that when it writes tools for your repo.

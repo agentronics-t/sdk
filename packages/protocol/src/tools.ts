@@ -8,11 +8,15 @@ import { z } from 'zod'
  */
 export const ToolDescriptor = z.object({
   name: z.string().min(1),
+  /** Human-readable name (WebMCP `title`). */
+  title: z.string().optional(),
   group: z.string().optional(),
   page: z.string().optional(),
   description: z.string().default(''),
   inputSchema: z.record(z.unknown()).default({}),
   outputSchema: z.record(z.unknown()).optional(),
+  /** WebMCP annotations: readOnlyHint, consequentialHint, untrustedContentHint. */
+  annotations: z.record(z.boolean()).optional(),
   tokens: z.number().int().nonnegative().default(0),
 })
 export type ToolDescriptor = z.infer<typeof ToolDescriptor>

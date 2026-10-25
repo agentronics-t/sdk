@@ -7,9 +7,9 @@ describe('spiffe auth method', () => {
     expect(identity).toBeNull()
   })
 
-  it('produces a verified identity with default vendor when no verifier is wired', async () => {
+  it('treats an unverified SVID as a claim when no verifier is wired', async () => {
     const identity = await spiffe().authenticate({ spiffeJwt: 'eyJ.spiffe' }, {})
-    expect(identity?.trust).toBe('verified')
+    expect(identity?.trust).toBe('declared')
     expect(identity?.vendor).toBe('spiffe')
     expect(identity?.class).toBe('webmcp')
     expect(identity?.signals.spiffe).toBe(true)

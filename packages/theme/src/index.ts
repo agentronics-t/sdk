@@ -6,34 +6,39 @@
  */
 
 export const tokens = {
-  accent: '#6366f1',
-  accentStrong: '#818cf8',
-  accentOn: '#07091a',
+  accent: '#d4ff3a',
+  accentStrong: '#e4ff7a',
+  accentOn: '#0b0b0c',
 
-  highlight: '#f59e0b',
-  highlightStrong: '#d97706',
+  highlight: '#ff4d1f',
+  highlightStrong: '#e0401a',
 
-  bg: '#07091a',
-  bgElevated: '#0d1028',
-  bgMuted: '#11152f',
-  border: '#1f2547',
-  borderStrong: '#2c3360',
+  bg: '#0b0b0c',
+  bgElevated: '#161618',
+  bgMuted: '#222225',
+  border: '#2c2c2e',
+  borderStrong: '#4a4a4e',
 
-  text: '#f4f4f5',
-  textMuted: '#a4a8c5',
-  textFaint: '#6b6f8e',
+  text: '#ffffff',
+  textMuted: '#b5b5b8',
+  textFaint: '#8a8a8e',
 
-  danger: '#f87171',
-  success: '#4ade80',
-  warning: '#fbbf24',
+  danger: '#ff6a42',
+  success: '#d4ff3a',
+  warning: '#ffb224',
 
   radius: 10,
   radiusLg: 14,
-  fontFamily:
-    "'Space Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+  fontFamily: "'Funnel Sans', 'Helvetica Neue', Arial, sans-serif",
+  fontDisplay: "'Funnel Display', 'Helvetica Neue', Arial, sans-serif",
+  fontMono: "'Martian Mono', ui-monospace, 'SF Mono', Menlo, monospace",
 } as const
 
 export type ThemeTokens = typeof tokens
 
-export const SPACE_MONO_GOOGLE_FONT_URL =
-  'https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap'
+/** The design system's three fonts: Funnel Display, Funnel Sans, Martian Mono. */
+export const FONT_URL =
+  'https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&family=Funnel+Sans:wght@300..800&family=Martian+Mono:wdth,wght@75..112.5,300..700&display=swap'
+
+/** @deprecated The brand no longer uses Space Mono; this is FONT_URL. */
+export const SPACE_MONO_GOOGLE_FONT_URL = FONT_URL

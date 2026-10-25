@@ -1,4 +1,13 @@
 {
   "title": "Guides",
-  "pages": ["policy-cookbook", "memory-cookbook", "nextjs", "vite-react", "plain-html", "connect-to-dashboard", "migration-from-raw-webmcp"]
+  "pages": [
+    "connect-to-dashboard",
+    "upgrade-0-7",
+    "nextjs",
+    "vite-react",
+    "plain-html",
+    "policy-cookbook",
+    "memory-cookbook",
+    "migration-from-raw-webmcp"
+  ]
 }

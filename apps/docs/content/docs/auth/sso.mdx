@@ -3,6 +3,10 @@ title: SSO (OIDC)
 description: Workforce SSO via OpenID Connect ID tokens — Okta, Azure AD, Google Workspace, Auth0.
 ---
 
+<Callout type="info">
+  **Coming later.** This method is built in the SDK but off by default and not yet in the console, and the hosted verification below ran on the retired gateway — it isn't available until this method ships. See [Authentication](/docs/auth/overview#coming-later).
+</Callout>
+
 # SSO (OIDC)
 
 Workforce agents acting on behalf of a human in an enterprise IdP tenant. The agent has done an SSO flow (interactive or service‑account) and holds an OIDC ID token. The SDK forwards the token to the gateway, which validates the JWT signature + claims against the customer‑configured IdP discovery document.

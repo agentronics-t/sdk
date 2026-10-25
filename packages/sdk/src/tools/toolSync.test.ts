@@ -48,7 +48,7 @@ describe('createToolSync.push', () => {
     const count = await sync.push([tool])
     expect(count).toBe(1)
     const [url, init] = fetcher.mock.calls[0]!
-    expect(url).toBe('https://gw.example.com/v1/sites/shop%20acme/tools')
+    expect(url).toBe('https://gw.example.com/v1/pub/sites/shop%20acme/tools')
     expect(init?.method).toBe('PUT')
     expect((init?.headers as Record<string, string>).authorization).toBe('Bearer agtx_pk_test')
     const body = JSON.parse(init?.body as string)

@@ -1,101 +1,100 @@
-/* Agentronics docs theme — brand palette (light + dark) + Fumadocs v14 mapping.
+/* Agentronics docs theme: the same design system as agentronics.dev and the
+ * console (the cofounder's redesign, public/home-assets/styles.css there).
  *
- * Canonical tokens mirror landing_page_UI/Colors/agentronics-palette.html and the
- * marketing site: cool-slate neutrals, indigo #736ced primary, amber accent, with
- * Geist + JetBrains Mono (loaded in layout.tsx as --font-sans / --font-mono).
+ * Five colours: ink #0B0B0C, paper #FFFFFF, lime #D4FF3A (go, ready, the
+ * primary action, the active nav item, always with ink text), amber #FFB224
+ * (partly, ask first), red #FF4D1F (not ready, deny). Links are ink on white
+ * and lime on ink. Fonts (Funnel Display / Funnel Sans / Martian Mono) are
+ * loaded in layout.tsx as --font-display / --font-sans / --font-mono.
  *
- * The docs are intentionally self-contained: the shared @agentronics/theme package
- * still ships the OLD dark-only Space Mono palette (consumed by demo/dashboard), so
- * we define the brand role tokens here instead of importing it.
- *
- * Fumadocs UI v14 reads `--fd-*` variables in **HSL channel** format (`H S% L%`),
- * consumed as `hsl(var(--fd-background) / 1)`. We map the brand palette into `--fd-*`
- * as HSL triplets for BOTH light (:root) and dark (.dark). The hex role tokens
- * (--canvas/--surface/--content/--brand/...) are defined alongside for the docs home
- * (landing.css) and the custom MDX widgets. */
+ * Fumadocs UI v14 reads `--fd-*` variables as HSL channels (`H S% L%`), so the
+ * palette is mapped twice: hex role tokens for our own widgets, HSL for Fumadocs. */
 
 :root {
-  /* Brand role tokens — LIGHT (hex) */
-  --canvas: #f6f7f9;
+  --ink: #0b0b0c;
+  --paper: #ffffff;
+  --lime: #d4ff3a;
+  --amber: #ffb224;
+  --red: #ff4d1f;
+
+  /* role tokens — LIGHT */
+  --canvas: #ffffff;
   --surface: #ffffff;
-  --surface-raised: #f6f7f9;
-  --border: #e3e6ec;
-  --border-strong: #cbd0da;
-  --content: #0e1017;
-  --content-secondary: #515a6c;
-  --content-muted: #828a9b;
-  --brand: #736ced;       /* identity / accents / glow — not for white text */
-  --brand-solid: #5a4fd9; /* interactive fill w/ white text (AA 5.9:1) */
-  --brand-soft: #f0effe;  /* tinted container */
-  --accent: #ff9e1c;
-  --accent-content: #06070e;
-  --ring: #736ced;
-  --success: #18935a; --success-bg: #e7f6ee;
-  --warning: #d97706; --warning-bg: #fdf2e0;
-  --danger: #d92d3c; --danger-bg: #fdecec;
-  --info: #2081c3; --info-bg: #e6f2fb;
-  --code-bg: #0e1017; --code-fg: #e4e2fd;
-  /* Shape */
-  --radius-sm: 7px; --radius-md: 9px; --radius-lg: 12px; --radius-xl: 14px; --radius-pill: 999px;
+  --surface-raised: #f4f4f4;
+  --border: rgba(11, 11, 12, .15);
+  --border-strong: #0b0b0c;
+  --content: #0b0b0c;
+  --content-secondary: rgba(11, 11, 12, .72);
+  --content-muted: rgba(11, 11, 12, .58);
+  --brand: #0b0b0c;
+  --brand-solid: #0b0b0c;
+  --brand-soft: color-mix(in srgb, #d4ff3a 32%, #ffffff);
+  --accent: #d4ff3a;
+  --accent-content: #0b0b0c;
+  --ring: #0b0b0c;
+  --success: #4d6b00; --success-bg: color-mix(in srgb, #d4ff3a 38%, #ffffff);
+  --warning: #8a5a00; --warning-bg: color-mix(in srgb, #ffb224 26%, #ffffff);
+  --danger: #c2320a; --danger-bg: color-mix(in srgb, #ff4d1f 14%, #ffffff);
+  --info: #0b0b0c; --info-bg: #ececed;
+  --code-bg: #0b0b0c; --code-fg: rgba(255, 255, 255, .85);
+  --radius-sm: 8px; --radius-md: 10px; --radius-lg: 14px; --radius-xl: 18px; --radius-pill: 999px;
 
   /* Fumadocs v14 — LIGHT (HSL channels) */
-  --fd-background: 220 20% 97%;       /* canvas #f6f7f9 */
-  --fd-foreground: 224 24% 7%;        /* content #0e1017 */
-  --fd-card: 0 0% 100%;               /* surface #ffffff */
-  --fd-card-foreground: 224 24% 7%;
+  --fd-background: 0 0% 100%;         /* paper */
+  --fd-foreground: 240 4% 4%;         /* ink #0b0b0c */
+  --fd-card: 0 0% 100%;
+  --fd-card-foreground: 240 4% 4%;
   --fd-popover: 0 0% 100%;
-  --fd-popover-foreground: 224 24% 7%;
-  --fd-muted: 220 19% 94%;            /* neutral-100 #eceef2 */
-  --fd-muted-foreground: 221 11% 56%; /* content-muted #828a9b */
-  --fd-border: 220 19% 91%;           /* border #e3e6ec */
-  --fd-primary: 245 64% 58%;          /* brand-solid #5a4fd9 (white text) */
+  --fd-popover-foreground: 240 4% 4%;
+  --fd-muted: 0 0% 96%;               /* #f4f4f4, the home page's grey sections */
+  --fd-muted-foreground: 240 1% 36%;  /* ink at 58% */
+  --fd-border: 240 1% 86%;            /* ink at 15% */
+  --fd-primary: 240 4% 4%;            /* ink: lime can't be text on white */
   --fd-primary-foreground: 0 0% 100%;
-  --fd-secondary: 220 19% 94%;
-  --fd-secondary-foreground: 224 24% 7%;
-  --fd-accent: 244 88% 97%;           /* brand-soft #f0effe (hover surface) */
-  --fd-accent-foreground: 224 24% 7%;
-  --fd-ring: 243 78% 68%;             /* ring #736ced */
+  --fd-secondary: 0 0% 96%;
+  --fd-secondary-foreground: 240 4% 4%;
+  --fd-accent: 73 100% 89%;           /* lime tint */
+  --fd-accent-foreground: 240 4% 4%;
+  --fd-ring: 240 4% 4%;
 }
 
 .dark {
-  /* Brand role tokens — DARK (hex) */
-  --canvas: #06070e;
-  --surface: #0e1017;
-  --surface-raised: #181c24;
-  --border: #262b35;
-  --border-strong: #3b4350;
-  --content: #f4f5f8;
-  --content-secondary: #b6bcca;
-  --content-muted: #8b93a4;
-  --brand: #8d85f2;       /* lifted so it glows on near-black */
-  --brand-solid: #5a4fd9;
-  --brand-soft: #1a1840;
-  --accent: #ffae33;
-  --accent-content: #06070e;
-  --ring: #8d85f2;
-  --success: #34d399; --success-bg: #0e2a1d;
-  --warning: #fbbf24; --warning-bg: #2e2106;
-  --danger: #f76e72; --danger-bg: #2c1315;
-  --info: #38bdf8; --info-bg: #0a2433;
-  --code-bg: #0a0b12; --code-fg: #cbc7fb;
+  /* role tokens — DARK (ink) */
+  --canvas: #0b0b0c;
+  --surface: #161618;
+  --surface-raised: #222225;
+  --border: rgba(255, 255, 255, .14);
+  --border-strong: rgba(255, 255, 255, .5);
+  --content: #ffffff;
+  --content-secondary: rgba(255, 255, 255, .72);
+  --content-muted: rgba(255, 255, 255, .56);
+  --brand: #d4ff3a;
+  --brand-solid: #d4ff3a;
+  --brand-soft: color-mix(in srgb, #d4ff3a 16%, #161618);
+  --ring: #d4ff3a;
+  --success: #d4ff3a; --success-bg: color-mix(in srgb, #d4ff3a 14%, #161618);
+  --warning: #ffb224; --warning-bg: color-mix(in srgb, #ffb224 14%, #161618);
+  --danger: #ff6a42; --danger-bg: color-mix(in srgb, #ff4d1f 16%, #161618);
+  --info: #ffffff; --info-bg: #222225;
+  --code-bg: #050506; --code-fg: rgba(255, 255, 255, .85);
 
   /* Fumadocs v14 — DARK (HSL channels) */
-  --fd-background: 232 40% 4%;        /* canvas #06070e */
-  --fd-foreground: 225 22% 96%;       /* content #f4f5f8 */
-  --fd-card: 224 24% 7%;              /* surface #0e1017 */
-  --fd-card-foreground: 225 22% 96%;
-  --fd-popover: 224 24% 7%;
-  --fd-popover-foreground: 225 22% 96%;
-  --fd-muted: 220 20% 12%;            /* surface-raised #181c24 */
-  --fd-muted-foreground: 221 12% 59%; /* content-muted #8b93a4 */
-  --fd-border: 220 16% 18%;           /* border #262b35 */
-  --fd-primary: 244 81% 74%;          /* brand #8d85f2 */
-  --fd-primary-foreground: 232 40% 4%;
-  --fd-secondary: 220 20% 12%;
-  --fd-secondary-foreground: 225 22% 96%;
-  --fd-accent: 243 45% 17%;           /* brand-soft dark #1a1840 */
-  --fd-accent-foreground: 225 22% 96%;
-  --fd-ring: 244 81% 74%;             /* ring #8d85f2 */
+  --fd-background: 240 4% 4%;         /* ink */
+  --fd-foreground: 0 0% 100%;
+  --fd-card: 240 4% 9%;               /* #161618 */
+  --fd-card-foreground: 0 0% 100%;
+  --fd-popover: 240 4% 9%;
+  --fd-popover-foreground: 0 0% 100%;
+  --fd-muted: 240 4% 14%;             /* #222225 */
+  --fd-muted-foreground: 240 1% 58%;
+  --fd-border: 240 2% 18%;
+  --fd-primary: 73 100% 61%;          /* lime #d4ff3a */
+  --fd-primary-foreground: 240 4% 4%;
+  --fd-secondary: 240 4% 14%;
+  --fd-secondary-foreground: 0 0% 100%;
+  --fd-accent: 74 34% 17%;            /* lime at 16% on #161618 */
+  --fd-accent-foreground: 0 0% 100%;
+  --fd-ring: 73 100% 61%;
 }
 
 /* ----------------------------------------------------------------------- *
@@ -106,8 +105,16 @@ body {
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), var(--font-sans), sans-serif;
+  letter-spacing: -0.03em;
+}
+
 ::selection {
-  background: color-mix(in srgb, var(--brand) 26%, transparent);
+  background: var(--lime);
+  color: var(--ink);
 }
 
 ::-webkit-scrollbar {
@@ -122,10 +129,10 @@ body {
   border-radius: 5px;
 }
 
-/* Inline code — indigo-tinted pill (excludes code inside <pre>). */
+/* Inline code — a quiet ink pill (excludes code inside <pre>). */
 :not(pre) > code {
-  background: color-mix(in srgb, var(--brand) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
+  background: color-mix(in srgb, var(--content) 6%, transparent);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 0.875em;
@@ -136,16 +143,23 @@ body {
 /* Code blocks — themed surface (Shiki dual-theme handles token colors per mode);
    we only set the frame + mono font so syntax stays readable in light and dark. */
 pre {
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-lg);
   font-family: var(--font-mono), ui-monospace, monospace;
 }
 
-/* Focus rings — 2px brand, never removed. */
+/* Focus rings — 3px, ink on light and lime on dark, never removed. */
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 3px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* Active sidebar page: lime with ink text, like the console's nav and the
+   home page's access-rule switch. (Fumadocs marks it bg-fd-primary/10.) */
+a[data-active="true"].bg-fd-primary\/10 {
+  background: var(--lime);
+  color: var(--ink);
 }

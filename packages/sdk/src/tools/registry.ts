@@ -1,17 +1,28 @@
 import type { AgentIdentity, PolicyEvaluation, PolicyRule } from '@agentronics/protocol'
 import type { TraceInput } from '../observability/tracer.js'
+import type { Reviewer } from '../authz/reviewPrompt.js'
+import type { ToolAnnotations } from './modelContext.js'
 
 export interface GovernedTool<Input = unknown, Output = unknown> {
   name: string
+  /** Human-readable name agents and browsers may show (WebMCP `title`). */
+  title?: string
   version?: string
   group?: string
   description?: string
+  /** WebMCP hints: readOnlyHint, consequentialHint, untrustedContentHint. */
+  annotations?: ToolAnnotations
+  /** Other origins whose agents may see this tool (WebMCP `exposedTo`). */
+  exposedTo?: string[]
   inputSchema?: Record<string, unknown>
   outputSchema?: Record<string, unknown>
   stage?: string
   authz?: Omit<PolicyRule, 'id' | 'tool'>
   rateLimit?: PolicyRule['rateLimit']
-  execute: (input: Input, context: { identity: AgentIdentity | null }) => Promise<Output> | Output
+  execute: (
+    input: Input,
+    context: { identity: AgentIdentity | null; signal?: AbortSignal }
+  ) => Promise<Output> | Output
 }
 
 export interface ToolRegistryOptions {
@@ -31,6 +42,16 @@ export interface ToolRegistryOptions {
    * - `execute(name, input, identity)` → respected
    */
   identityResolver?: () => AgentIdentity | null
+  /**
+   * Asks a person to approve a call whose policy decision is `review`. Without
+   * one, review calls are refused (never silently run).
+   */
+  reviewer?: Reviewer
+}
+
+export interface ExecuteOptions {
+  /** Aborted when the agent cancels the call (WebMCP passes one per call). */
+  signal?: AbortSignal
 }
 
 export interface ToolRegistry {
@@ -44,7 +65,8 @@ export interface ToolRegistry {
   execute<Input, Output>(
     name: string,
     input: Input,
-    identity?: AgentIdentity | null
+    identity?: AgentIdentity | null,
+    options?: ExecuteOptions
   ): Promise<Output>
 }
 
@@ -54,6 +76,7 @@ export const createToolRegistry = ({
   listPolicies,
   onTrace,
   identityResolver,
+  reviewer,
 }: ToolRegistryOptions): ToolRegistry => {
   const tools = new Map<string, GovernedTool>()
   const disabled = new Set<string>()
@@ -119,7 +142,8 @@ export const createToolRegistry = ({
     async execute<Input, Output>(
       name: string,
       input: Input,
-      identity?: AgentIdentity | null
+      identity?: AgentIdentity | null,
+      options: ExecuteOptions = {}
     ): Promise<Output> {
       // `undefined` means "use the ambient identity"; explicit `null` means
       // "anonymous". This lets button handlers stay as `tools.execute(name,
@@ -138,17 +162,43 @@ export const createToolRegistry = ({
         onTrace?.({ type: 'tool.executed', tool: name, agent: resolvedIdentity, policy, outcome: 'blocked' })
         throw new Error(policy.reason)
       }
-      const policy = await evaluate(name, { identity: resolvedIdentity })
+      let policy = await evaluate(name, { identity: resolvedIdentity })
       if (policy.decision === 'deny') {
         onTrace?.({ type: 'tool.executed', tool: name, agent: resolvedIdentity, policy, outcome: 'blocked' })
         throw new Error(policy.reason)
+      }
+      if (policy.decision === 'review') {
+        const request: Parameters<Reviewer>[0] = { tool: name, input, identity: resolvedIdentity, reason: policy.reason }
+        if (tool.title !== undefined) request.title = tool.title
+        if (tool.description !== undefined) request.description = tool.description
+        const approved = reviewer ? await reviewer(request).catch(() => false) : false
+        onTrace?.({
+          type: 'authz.evaluated',
+          tool: name,
+          agent: resolvedIdentity,
+          policy,
+          outcome: approved ? 'success' : 'blocked',
+          metadata: { review: true, approved, reviewer: reviewer ? 'configured' : 'none' },
+        })
+        if (!approved) {
+          const refused: PolicyEvaluation = {
+            ...policy,
+            decision: 'deny',
+            reason: reviewer ? 'The person on the page did not approve this action.' : 'This action needs review and no reviewer is configured.',
+          }
+          onTrace?.({ type: 'tool.executed', tool: name, agent: resolvedIdentity, policy: refused, outcome: 'blocked' })
+          throw new Error(refused.reason)
+        }
+        policy = { ...policy, reason: `${policy.reason} Approved by the person on the page.` }
       }
       // Time the execution and trace the outcome either way — a tool that
       // throws is still something the agent did, and the observability /
       // analytics surfaces need both the latency and the error.
       const start = Date.now()
       try {
-        const output = await tool.execute(input, { identity: resolvedIdentity })
+        const context: { identity: AgentIdentity | null; signal?: AbortSignal } = { identity: resolvedIdentity }
+        if (options.signal) context.signal = options.signal
+        const output = await tool.execute(input, context)
         onTrace?.({
           type: 'tool.executed',
           tool: name,

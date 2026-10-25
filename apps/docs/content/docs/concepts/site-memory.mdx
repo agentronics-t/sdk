@@ -14,17 +14,17 @@ This is **not** the agent's own memory. Conversation history belongs to the agen
 ## The end-to-end flow
 
 ```
-author (SDK or dashboard)
-        │  provideSiteMemory({...})  /  PUT /v1/sites/:id/memory
+author (SDK)
+        │  provideSiteMemory({...})  →  sync.pushMemory(snapshot)  (your server)
         ▼
-   gateway store  ──(ETag)──►  client.syncSiteMemory()  ──►  browser snapshot
+ Agentronics API  ──(ETag)──►  client.syncSiteMemory() / syncConfig()  ──►  browser snapshot
         │                                                        │
         │                                                        ├─ WebMCP synthetic tool  → WebMCP agents
         ├─ /.well-known/agent-context.json → anything, no SDK    ├─ <meta> + JSON-LD       → DOM agents, search
         └─ dashboard "Site memory" view + AI score               └─ visual overlay         → screenshot agents
 ```
 
-You can author memory two ways — in code (`provideSiteMemory`) or in the dashboard — and they converge on the same gateway-stored snapshot. The browser SDK pulls it with `syncSiteMemory()` and fans it out to the four delivery channels.
+Author memory in code (`provideSiteMemory`) and push the snapshot from your server with `createDashboardSync().pushMemory(snapshot, score)` — the console's Memory page shows it. The browser SDK pulls it with `syncSiteMemory()` (or `syncConfig()`) using its publishable key and fans it out to the four delivery channels.
 
 ## Provide it once
 
@@ -89,7 +89,17 @@ Different agent classes consume site memory differently. The SDK ships all four 
 | Visual overlay | Screenshot agents | `client.installMemoryDelivery({ overlay: true })` |
 | `/.well-known/agent-context.json` | Anything, no SDK | `serializeWellKnownContext({ snapshot })` on the host |
 
-The well-known endpoint is the universal fallback — like `robots.txt` for AI agents. Agentronics serves it through the gateway; production hosts proxy from their domain.
+The well-known endpoint is the universal fallback — like `robots.txt` for AI agents. Serve it from your own domain with one route:
+
+```ts
+// app/.well-known/agent-context.json/route.ts (Next.js)
+import { createAgentContextHandler } from '@agentronics/sdk/server'
+import { sync } from '@/lib/agentronics' // createDashboardSync({ url, ingestKey, siteId })
+
+export const GET = createAgentContextHandler({ sync })
+```
+
+It serves the last snapshot pushed for the site, cached for five minutes, and keeps serving it if the console is unreachable.
 
 ### Site context as a WebMCP tool
 

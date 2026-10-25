@@ -7,12 +7,12 @@ describe('mtls auth method', () => {
     expect(identity).toBeNull()
   })
 
-  it('produces a verified identity from raw XFCC when no verifier is wired', async () => {
+  it('treats raw XFCC as a claim when no verifier is wired', async () => {
     const identity = await mtls().authenticate(
       { xfccHeader: 'Subject="CN=agent-42"' },
       {}
     )
-    expect(identity?.trust).toBe('verified')
+    expect(identity?.trust).toBe('declared')
     expect(identity?.vendor).toBe('mtls')
     expect(identity?.class).toBe('webmcp')
     expect(identity?.signals.mtls).toBe(true)

@@ -5,7 +5,7 @@ description: How Agentronics records detection, auth, policy, memory, and tool t
 
 # Observability
 
-The SDK records trace events for the governance decisions it makes in the browser. In v0.1 those traces stay local by default, so development works before the gateway routes exist. You can opt into console, webhook, or gateway export from `init()`.
+The SDK records a trace for every governance decision it makes — detections, identities, authorization decisions and reviews, tool registrations and calls, memory access. Traces stay in an in-memory buffer until you export them. Sent to the Agentronics console, they power the **Observability** page (agent sessions, filters, error rate, p50/p95 tool latency) and every pillar page.
 
 ## Trace shape
 
@@ -26,7 +26,7 @@ Every trace has stable routing fields plus optional context for the pillar that 
 }
 ```
 
-Current event types include detection (`agent.detected`, `agent.missed`), identity (`auth.identity_presented`), authorization (`authz.evaluated`), and site memory (`memory.accessed`, `memory.updated`).
+Event types: detection (`agent.detected`, `agent.missed`), identity (`auth.identity_presented`, `auth.identity_cleared`), authorization (`authz.evaluated` — reviews carry `metadata.review` and `approved`), tools (`tool.registered`, `tool.surfaced`, `tool.executed`, `tool.progressed`), memory (`memory.accessed`, `memory.updated`) and `sdk.error`. `sessionId` groups one agent's events into a session.
 
 ## Reading local traces
 
@@ -42,22 +42,33 @@ const traces = client.traces()
 
 The in-memory buffer keeps the newest 500 events by default. Set `trace.bufferSize` to tune that.
 
-## Exporters
+## Sending traces to the console
+
+The console's ingest key is a secret, so the browser can't send traces directly. Point the browser at a route on your own site, and relay from there:
 
 ```ts
-const client = Agentronics.init({
-  siteId: 'shop-acme',
-  publishableKey: process.env.NEXT_PUBLIC_AGENTRONICS_KEY!,
-  trace: {
-    gateway: true,
-    webhookUrl: 'https://example.com/agentronics-webhook',
-    traceRate: 1,
-    errorRate: 1,
-  },
+// browser
+Agentronics.init({ publishableKey, siteId: 'shop', trace: { webhookUrl: '/api/agentronics' } })
+```
+
+```ts
+// app/api/agentronics/route.ts (Next.js) — or any Fetch-style handler
+import { createTraceRelay } from '@agentronics/sdk/server'
+
+export const POST = createTraceRelay({
+  url: process.env.AGENTRONICS_API_URL!,
+  ingestKey: process.env.AGENTRONICS_INGEST_KEY!,
+  siteId: 'shop', // every event is pinned to this site, whatever the browser sent
 })
 ```
 
-`gateway: true` posts batches to `/v1/traces` with the publishable key. `webhookUrl` sends the same event payload to your endpoint with retry/backoff, queuing failed events in browser storage for the next successful delivery. `debug: true` also enables a console exporter.
+The relay drops unknown event types, caps each batch at 100 events, and always answers `202` quickly — a console outage never breaks your page. The webhook exporter retries with backoff and queues failed batches in browser storage.
+
+Server-side traces (e.g. from the auth middleware) go straight to the console with `createDashboardExporter({ url, ingestKey })` — see [Connect to the console](/docs/guides/connect-to-dashboard).
+
+**Without a server route:** `trace: { gateway: true }` sends traces straight from the browser to the Agentronics API with your publishable key. The key must list the page's origin (console → *Settings → Publishable keys*); calls from other origins are refused, and each key is rate-limited.
+
+Other exporters: `debug: true` adds a console exporter; `trace.exporters` takes your own `{ name, export(events) }`; `traceRate` / `errorRate` sample. To keep a copy of everything, pass `forward` to the relay — see [Data export](/docs/enterprise/data-export).
 
 ## PII scrub
 

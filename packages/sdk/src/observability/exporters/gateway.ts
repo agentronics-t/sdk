@@ -15,7 +15,7 @@ export const createGatewayExporter = ({
   name: 'gateway',
   async export(events: TraceEventRecord[]) {
     const batch: TraceBatch = { publishableKey, events }
-    await fetcher(`${gatewayUrl.replace(/\/$/, '')}/v1/traces`, {
+    await fetcher(`${gatewayUrl.replace(/\/$/, '')}/v1/pub/traces`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

@@ -12,7 +12,8 @@ export const sso = (): AuthMethod => ({
     const verified = await context.verifyToken?.('sso', input.ssoIdToken)
     return {
       class: input.classHint ?? 'dom',
-      trust: verified?.trust ?? 'verified',
+      // Nothing checked the token → only a claim. A verifier (auth.verifyToken) decides the real trust.
+      trust: verified?.trust ?? 'declared',
       confidence: 1,
       vendor: verified?.vendor ?? input.vendorHint ?? 'sso',
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,

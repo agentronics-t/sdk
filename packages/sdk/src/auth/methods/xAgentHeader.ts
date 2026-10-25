@@ -11,7 +11,8 @@ export const xAgentHeader = (): AuthMethod => ({
 
     return {
       class: parsedClass.success ? parsedClass.data : 'dom',
-      trust: proof ? 'verified' : 'declared',
+      // The proof segment is not checked client-side, so the header is a claim.
+      trust: 'declared',
       confidence: proof ? 1 : 0.8,
       vendor,
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent,

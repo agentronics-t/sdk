@@ -148,4 +148,4 @@ export function ShippingNotice() {
 
 `@agentronics/react` is client-only. Don't import its hooks from server components. The provider lives in a `'use client'` file and the SDK initializes on the browser — there is no Next.js-specific server runtime needed.
 
-For static analytics on traces, fetch them from the Agentronics gateway, not from the client SDK.
+For analytics on traces, relay them to the Agentronics console (see [Observability](/docs/observability#sending-traces-to-the-console)) rather than reading them from the client SDK.

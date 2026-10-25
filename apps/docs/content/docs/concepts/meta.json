@@ -4,7 +4,8 @@
     "three-agent-classes",
     "trust-levels",
     "policies",
-    "site-memory",
-    "tool-management"
+    "tool-management",
+    "procedural-memory",
+    "site-memory"
   ]
 }

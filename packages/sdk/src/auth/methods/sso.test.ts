@@ -7,9 +7,9 @@ describe('sso auth method', () => {
     expect(identity).toBeNull()
   })
 
-  it('produces a verified identity when token is present and no verifier is configured', async () => {
+  it('treats an unverified token as a claim when no verifier is configured', async () => {
     const identity = await sso().authenticate({ ssoIdToken: 'eyJ.abc.def' }, {})
-    expect(identity?.trust).toBe('verified')
+    expect(identity?.trust).toBe('declared')
     expect(identity?.vendor).toBe('sso')
     expect(identity?.signals.sso).toBe(true)
   })

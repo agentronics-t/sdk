@@ -11,7 +11,7 @@ describe('GET /', () => {
     expect(res.headers.get('content-type') ?? '').toContain('text/html')
     const body = await res.text()
     expect(body).toContain('AGENTRONICS · GATEWAY')
-    expect(body).toContain('--accent: #6366f1')
+    expect(body).toContain('--accent: #d4ff3a')
     expect(body).toContain('GET /v1/health')
   })
 

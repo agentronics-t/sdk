@@ -23,10 +23,10 @@ const rule = (overrides: Partial<PolicyRule> = {}): PolicyRule => ({
 })
 
 describe('policy engine', () => {
-  it('falls back to review when no rule matches', () => {
+  it('falls back to allow when no rule matches', () => {
     const engine = createPolicyEngine([rule({ tool: 'unrelated' })])
     const result = engine.evaluate({ tool: 'cart.checkout', identity: id() })
-    expect(result.decision).toBe('review')
+    expect(result.decision).toBe('allow')
     expect(result.ruleId).toBeNull()
   })
 

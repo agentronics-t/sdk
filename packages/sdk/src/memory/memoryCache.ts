@@ -30,7 +30,7 @@ export const createMemoryCache = ({
 
     async sync(): Promise<MemoryCacheSnapshot> {
       const response = await fetcher(
-        `${gatewayUrl.replace(/\/$/, '')}/v1/sites/${encodeURIComponent(siteId)}/memory`,
+        `${gatewayUrl.replace(/\/$/, '')}/v1/pub/sites/${encodeURIComponent(siteId)}/memory`,
         {
           headers: {
             authorization: `Bearer ${publishableKey}`,

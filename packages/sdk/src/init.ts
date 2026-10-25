@@ -5,9 +5,12 @@ import {
   type AgentIdentity,
   type PolicyEvaluation,
   type PolicyRule,
+  PolicyRule as PolicyRuleSchema,
+  SiteMemory as SiteMemorySchema,
   type TraceEvent,
 } from '@agentronics/protocol'
 import { detectAgent, type DetectAgentOptions } from './detection/index.js'
+import { createVisionDetector, type VisionDetector, type VisionDetectorOptions } from './detection/vision.js'
 import { SDK_VERSION } from './version.js'
 import {
   createIdentityStore,
@@ -41,7 +44,9 @@ import {
 import { surfaceTools, explainSurfacing, type SurfacingDecision } from './tools/surfacing.js'
 import { groupTools, type ToolGroupSummary } from './tools/groups.js'
 import { estimateBudget, type TokenBudgetReport } from './tools/tokenEstimate.js'
-import { createWebMcpAdapter, type WebMcpAdapter } from './tools/webmcpAdapter.js'
+import { createWebMcpAdapter, type WebMcpAdapter, type WebMcpRegistration } from './tools/webmcpAdapter.js'
+import { onWebMcpActivity } from './tools/modelContext.js'
+import { createReviewPrompt, type Reviewer } from './authz/reviewPrompt.js'
 import type { SiteMemory } from '@agentronics/protocol'
 import {
   createConsoleExporter,
@@ -56,14 +61,15 @@ export interface InitOptions {
   publishableKey: string
   siteId?: string
   /**
-   * Override the gateway URL the SDK calls. **Reserved for local development
-   * only** — the only accepted values are `localhost` / `127.0.0.1` URLs (so
-   * `pnpm dev` against a local gateway works). Any other value throws at
-   * `init()` time.
+   * Override the Agentronics API URL the SDK calls. **Reserved for local
+   * development only** — the only accepted values are `localhost` /
+   * `127.0.0.1` URLs (so `pnpm dev` against a local API works). Any other
+   * value throws at `init()` time.
    *
-   * Production deployments must omit this option. The SDK is hard-coded to
-   * call `https://gateway.agentronics.dev`. Custom backends are not
-   * supported, by design — see the project README + LICENSE NOTICE.
+   * Production deployments must omit this option. The SDK calls
+   * `https://api.agentronics.dev` (the retired `gateway.agentronics.dev` is
+   * accepted and mapped to it). Custom backends are not supported, by
+   * design — see the project README + LICENSE NOTICE.
    *
    * @internal — kept on the public type only so dev tooling type-checks.
    */
@@ -74,6 +80,25 @@ export interface InitOptions {
   auth?: AuthContext
   progression?: ProgressionConfig
   tools?: GovernedTool[]
+  /**
+   * Who approves tool calls whose policy decision is `review`. Default in the
+   * browser: a small "Allow / Not now" dialog for the person on the page.
+   * Pass your own function to use your UI, or `false` to refuse every review.
+   */
+  review?: Reviewer | false
+  /**
+   * `'0.6'` keeps the pre-0.7 behaviour while you upgrade: unverified tokens
+   * count as `verified`, SSO / SPIFFE / mTLS are on, and `review` rules run
+   * without asking. Insecure and temporary — see the 0.7 upgrade guide.
+   * @deprecated Remove once you've moved to the 0.7 behaviour.
+   */
+  compat?: '0.6'
+  /**
+   * Approved tool descriptions from the console's Procedural memory page
+   * (`createDashboardSync().pullConfig().toolDescriptions`). They replace the
+   * code's description when tools are published to agents.
+   */
+  toolDescriptions?: Record<string, string>
   /**
    * Run agent detection automatically on init and keep the resulting
    * identity in agentContext so every subsequent tools.execute() call gets
@@ -87,6 +112,12 @@ export interface InitOptions {
    * `ready` promise on the returned client resolves once the cycle finishes.
    */
   autoDetect?: boolean | DetectAgentOptions
+  /**
+   * Watch interactions for vision-model ("screenshot") agents — teleport and
+   * centre clicks, metronome typing. On by default in the browser whenever
+   * `autoDetect` is on; reads timing and coordinates only, never keystrokes.
+   */
+  visionDetection?: boolean | Omit<VisionDetectorOptions, 'onDetect'>
   trace?: {
     enabled?: boolean
     bufferSize?: number
@@ -115,6 +146,8 @@ export interface AgentronicsClient {
   readonly tools: ToolRegistry
   readonly progression: ProgressionStore | null
   readonly webmcp: WebMcpAdapter
+  /** The vision-agent monitor, when running. */
+  readonly vision: VisionDetector | null
   /**
    * Resolves once the initial autoDetect cycle finishes. Rejects only if the
    * autoDetect configuration itself is invalid; detection failures resolve to
@@ -132,6 +165,12 @@ export interface AgentronicsClient {
   evaluate(tool: string, options?: { identity?: AgentIdentity | null }): Promise<PolicyEvaluation>
   syncPolicies(): Promise<PolicyRule[]>
   syncSiteMemory(): Promise<SiteMemory | null>
+  /**
+   * Pull everything the console manages for this site with the publishable
+   * key alone — authorization rules, approved tool descriptions and site
+   * memory — and apply it (re-publishing WebMCP tools if they changed).
+   */
+  syncConfig(): Promise<{ policies: PolicyRule[]; toolDescriptions: Record<string, string>; siteMemory: SiteMemory | null }>
   provideSiteMemory(memory: Partial<SiteMemory>): SiteMemory
   provideForPage(input: ProvideForPageInput): void
   installMemoryDelivery(options?: {
@@ -141,6 +180,8 @@ export interface AgentronicsClient {
   fetchWellKnown(origin?: string): Promise<SiteMemory | null>
   installDomEnforcer(): { uninstall: () => void }
   registerTool(tool: GovernedTool): () => void
+  /** Replace the description overrides (see `toolDescriptions`). */
+  setToolDescriptions(descriptions: Record<string, string>): void
   /** Push the full tool registry to the gateway so the dashboard can render
    *  the page-wise view (schemas, per-tool tokens, context fullness). */
   syncTools(): Promise<number>
@@ -148,7 +189,16 @@ export interface AgentronicsClient {
   explainSurfacing(options?: { identity?: AgentIdentity | null }): SurfacingDecision[]
   groupedTools(options?: { identity?: AgentIdentity | null }): ToolGroupSummary[]
   estimateTokens(options?: { identity?: AgentIdentity | null }): TokenBudgetReport
-  publishToWebMcp(options?: { identity?: AgentIdentity | null }): { revoked: boolean; surfaced: number }
+  /**
+   * Register the surfaced tools with `document.modelContext`. `registrations`
+   * resolves with each tool's status (callable / failed) once the browser
+   * has accepted or rejected it.
+   */
+  publishToWebMcp(options?: { identity?: AgentIdentity | null }): {
+    revoked: boolean
+    surfaced: number
+    registrations: Promise<WebMcpRegistration[]>
+  }
   notifyToolInvoked(toolName: string): void
   traces(): TraceEvent[]
   clearTraces(): void
@@ -161,10 +211,12 @@ export interface AgentronicsClient {
   ping(): Promise<{ ok: true; status: number; body: unknown } | { ok: false; status: number; error: string }>
 }
 
-const DEFAULT_GATEWAY_URL = 'https://gateway.agentronics.dev'
+const DEFAULT_GATEWAY_URL = 'https://api.agentronics.dev'
+/** The retired gateway host; still accepted so old configs keep working. */
+const RETIRED_GATEWAY_URL = 'https://gateway.agentronics.dev'
 
 /**
- * Lock the SDK to the canonical Agentronics gateway. The only override
+ * Lock the SDK to the canonical Agentronics API. The only override
  * accepted is a localhost / 127.0.0.1 URL — purely so contributors running
  * `pnpm dev` can hit a local gateway. Any other value (a competing host, a
  * proxy, an MITM target) throws synchronously, before any traces are
@@ -176,7 +228,8 @@ const DEFAULT_GATEWAY_URL = 'https://gateway.agentronics.dev'
  */
 const resolveGatewayUrl = (provided: string | undefined): string => {
   if (provided === undefined) return DEFAULT_GATEWAY_URL
-  if (provided === DEFAULT_GATEWAY_URL) return provided
+  if (provided.replace(/\/$/, '') === DEFAULT_GATEWAY_URL) return DEFAULT_GATEWAY_URL
+  if (provided.replace(/\/$/, '') === RETIRED_GATEWAY_URL) return DEFAULT_GATEWAY_URL
   let parsed: URL
   try {
     parsed = new URL(provided)
@@ -189,8 +242,8 @@ const resolveGatewayUrl = (provided: string | undefined): string => {
     return provided
   }
   throw new Error(
-    `Agentronics SDK does not support custom gateway URLs. ` +
-      `Omit \`gatewayUrl\` to use the canonical https://gateway.agentronics.dev. ` +
+    `Agentronics SDK does not support custom API URLs. ` +
+      `Omit \`gatewayUrl\` to use the canonical ${DEFAULT_GATEWAY_URL}. ` +
       `The only accepted override is a localhost / 127.0.0.1 URL for local development. ` +
       `Got: ${provided}`
   )
@@ -248,6 +301,20 @@ export const init = (options: InitOptions): AgentronicsClient => {
     onTrace: emitTrace,
   }
   if (options.auth !== undefined) authOptions.context = options.auth
+  if (options.compat === '0.6') {
+    authOptions.compat = '0.6'
+    console.warn(
+      "[agentronics] compat: '0.6' is on — unverified tokens are trusted and review rules run without asking. " +
+        'Remove it once you have upgraded: https://agentronics.dev/docs/guides/upgrade-0-7'
+    )
+  }
+  authOptions.onUnverifiedToken = (method) => {
+    if (options.compat === '0.6') return
+    console.warn(
+      `[agentronics] A ${method} credential was presented but nothing verifies it, so the agent is 'declared', not 'verified'. ` +
+        'Wire auth.verifyToken to your backend: https://agentronics.dev/docs/auth/overview#in-the-browser'
+    )
+  }
   const auth = createAuthEngine(authOptions)
   const agentContext = createAgentContextStore()
   const policyEngine = createPolicyEngine(policies)
@@ -295,8 +362,16 @@ export const init = (options: InitOptions): AgentronicsClient => {
     }
     return policy
   }
+  // compat '0.6': review rules ran the tool without asking before 0.7.
+  const legacyReviewer: Reviewer = async () => true
+  const reviewer: Reviewer | undefined =
+    options.review === false
+      ? undefined
+      : (options.review ??
+        (options.compat === '0.6' ? legacyReviewer : typeof document === 'undefined' ? undefined : createReviewPrompt()))
   const tools = createToolRegistry({
     evaluate,
+    ...(reviewer ? { reviewer } : {}),
     setPolicies: (rules) => policyEngine.set(rules),
     listPolicies: () => policyEngine.list(),
     onTrace: emitTrace,
@@ -323,13 +398,36 @@ export const init = (options: InitOptions): AgentronicsClient => {
     return ctx
   }
 
+  let toolDescriptions: Record<string, string> = { ...(options.toolDescriptions ?? {}) }
+  const withDescriptions = (list: GovernedTool[]) =>
+    list.map((tool) => {
+      const description = toolDescriptions[tool.name]
+      return description ? { ...tool, description } : tool
+    })
   const surfaceFor = (identity: AgentIdentity | null) =>
-    surfaceTools(tools.list(), surfacingContext(identity))
+    withDescriptions(surfaceTools(tools.list(), surfacingContext(identity)))
+  const applyToolDescriptions = (descriptions: Record<string, string>) => {
+    toolDescriptions = { ...descriptions }
+    if (publishedKey !== null) {
+      publishedKey = null // descriptions changed: re-register even if the names didn't
+      republish(surfaceFor(agentContext.snapshot().identity))
+    }
+  }
+
+  // Names of the last published set; null until the host first publishes.
+  let publishedKey: string | null = null
+  const keyOf = (list: GovernedTool[]) => list.map((tool) => tool.name).sort().join('\n')
+  const republish = (list: GovernedTool[]) => {
+    const key = keyOf(list)
+    if (key === publishedKey) return null
+    publishedKey = key
+    return webmcp.publish(list)
+  }
 
   const handleToolInvoked = (toolName: string) => {
     if (!progression) return
     const transition = progression.notify(toolName)
-    if (transition.changed) webmcp.publish(surfaceFor(agentContext.snapshot().identity))
+    if (transition.changed && publishedKey !== null) republish(surfaceFor(agentContext.snapshot().identity))
   }
 
   // Fallback identity used only when no detection has fired yet AND the call
@@ -346,22 +444,59 @@ export const init = (options: InitOptions): AgentronicsClient => {
   }
 
   const webmcp = createWebMcpAdapter({
-    invoke: async (tool, input) => {
+    invoke: async (tool, input, signal) => {
+      noteWebMcpCall(tool.name)
       const identity = agentContext.snapshot().identity ?? fallbackWebMcpIdentity
-      const result = await tools.execute(tool.name, input, identity)
+      const result = await tools.execute(tool.name, input, identity, signal ? { signal } : {})
       handleToolInvoked(tool.name)
       return result
     },
+  })
+
+  // A tool call or `toolactivated` event through document.modelContext is the
+  // WebMCP agent announcing itself: attribute the session to it unless a
+  // stronger identity (declared / authenticated) is already in place.
+  const adoptWebMcpAgent = (toolName: string) => {
+    const current = agentContext.snapshot().identity
+    if (current && current.trust !== 'detected') return
+    if (current?.class === 'webmcp') return
+    const identity: AgentIdentity = {
+      ...fallbackWebMcpIdentity,
+      signals: { source: webmcp.source() ?? 'document', tool: toolName },
+    }
+    agentContext.set(identity, 'detect')
+    emitTrace({ type: 'agent.detected', agent: identity, metadata: { detectedClass: 'webmcp', via: 'webmcp-activity' } })
+  }
+  const noteWebMcpCall = (toolName: string) => adoptWebMcpAgent(toolName)
+  onWebMcpActivity((activity) => {
+    if (activity.type === 'activated') adoptWebMcpAgent(activity.toolName)
   })
 
   // When the ambient identity changes (late WebMCP polyfill, declared
   // identity, successful authenticate()), re-publish the WebMCP surface so
   // any agent currently bound to navigator.modelContext sees the
   // identity-gated tool set rather than the stale anonymous one.
+  // Only once the host has published, and only when the identity-gated set
+  // actually changed: re-registering aborts the current registrations.
   agentContext.subscribe((snapshot) => {
-    if (!webmcp.available()) return
-    webmcp.publish(surfaceFor(snapshot.identity))
+    if (publishedKey === null || !webmcp.available()) return
+    republish(surfaceFor(snapshot.identity))
   })
+
+  const visionOption = options.visionDetection ?? options.autoDetect !== false
+  const vision: VisionDetector | null =
+    visionOption === false || typeof document === 'undefined'
+      ? null
+      : createVisionDetector({
+          ...(visionOption === true ? {} : visionOption),
+          onDetect: (identity) => {
+            const current = agentContext.snapshot().identity
+            // Never replace a declared/verified identity or a WebMCP agent with a heuristic.
+            if (current && (current.trust !== 'detected' || current.class === 'webmcp')) return
+            agentContext.set(identity, 'detect')
+            emitTrace({ type: 'agent.detected', agent: identity, metadata: { detectedClass: 'screenshot', via: 'vision-behaviour' } })
+          },
+        })
 
   // Kick off the initial detection cycle if the host opted in. Default is
   // on so /traces is populated with class/trust/signals without the host
@@ -399,6 +534,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
     tools,
     progression,
     webmcp,
+    vision,
     ready,
     detect,
     authenticate: async (input: AuthInput) => {
@@ -444,6 +580,27 @@ export const init = (options: InitOptions): AgentronicsClient => {
       }
       return snapshot.memory
     },
+    syncConfig: async () => {
+      const response = await fetch(
+        `${gatewayUrl.replace(/\/$/, '')}/v1/pub/sites/${encodeURIComponent(siteId)}/config`,
+        { headers: { authorization: `Bearer ${publishableKey}` } }
+      )
+      if (!response.ok) throw new Error(`Config sync failed with status ${response.status}.`)
+      const body = (await response.json()) as {
+        policies?: unknown
+        toolDescriptions?: Record<string, string>
+        siteMemory?: unknown
+      }
+      const rules = PolicyRuleSchema.array().parse(body.policies ?? [])
+      policyEngine.set(rules)
+      emitTrace({ type: 'authz.policies_set', metadata: { count: rules.length, synced: true } })
+      const memory = body.siteMemory && typeof body.siteMemory === 'object' && Object.keys(body.siteMemory).length
+        ? siteMemory.replace(SiteMemorySchema.parse(body.siteMemory))
+        : null
+      const descriptions = body.toolDescriptions && typeof body.toolDescriptions === 'object' ? body.toolDescriptions : {}
+      applyToolDescriptions(descriptions)
+      return { policies: rules, toolDescriptions: descriptions, siteMemory: memory }
+    },
     provideSiteMemory: (next: Partial<SiteMemory>) => siteMemory.provide(next),
     provideForPage: (input: ProvideForPageInput) => {
       siteMemory.provideForPage(input)
@@ -477,6 +634,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
         getIdentity: () => detect({ webmcp: { pollMs: 0 } }),
       }),
     registerTool: (tool: GovernedTool) => tools.register(tool),
+    setToolDescriptions: (descriptions: Record<string, string>) => applyToolDescriptions(descriptions),
     syncTools: async () => {
       const all = tools.list({ includeDisabled: true })
       const count = await toolSync.push(all)
@@ -490,15 +648,21 @@ export const init = (options: InitOptions): AgentronicsClient => {
     estimateTokens: ({ identity = null }: { identity?: AgentIdentity | null } = {}) => estimateBudget(surfaceFor(identity)),
     publishToWebMcp: ({ identity = null }: { identity?: AgentIdentity | null } = {}) => {
       const surfaced = surfaceFor(identity)
+      publishedKey = keyOf(surfaced)
       const result = webmcp.publish(surfaced)
-      surfaced.forEach((tool) => {
-        emitTrace({
-          type: 'tool.surfaced',
-          tool: tool.name,
-          metadata: { state: 'published', trust: identity?.trust ?? null, group: tool.group ?? null },
+      const registrations = result.registrations.then((list) => {
+        list.forEach((r) => {
+          emitTrace({
+            type: 'tool.surfaced',
+            tool: r.name,
+            outcome: r.status === 'callable' ? 'success' : 'error',
+            ...(r.error ? { error: r.error } : {}),
+            metadata: { state: r.status === 'callable' ? 'published' : 'failed', source: webmcp.source(), trust: identity?.trust ?? null },
+          })
         })
+        return list
       })
-      return { revoked: result.revoked, surfaced: surfaced.length }
+      return { revoked: result.revoked, surfaced: surfaced.length, registrations }
     },
     notifyToolInvoked: (toolName: string) => handleToolInvoked(toolName),
     evaluate,
@@ -506,7 +670,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
     clearTraces: () => tracer.clear(),
     async ping() {
       try {
-        const response = await fetch(`${gatewayUrl.replace(/\/$/, '')}/v1/health`, {
+        const response = await fetch(`${gatewayUrl.replace(/\/$/, '')}/v1/pub/health`, {
           method: 'GET',
           headers: { authorization: `Bearer ${publishableKey}` },
         })
