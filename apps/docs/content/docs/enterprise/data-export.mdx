@@ -1,6 +1,6 @@
 ---
 title: Data export
-description: Get your agent traces out — stream them to your own warehouse as they happen, or download them from the console.
+description: Get your agent traces out — stream them to your own warehouse, receive them by webhook, or download them from the console.
 ---
 
 # Data export
@@ -22,6 +22,47 @@ export const POST = createTraceRelay({
 ```
 
 `forward` runs alongside the console export; if it fails, the console still gets the batch, and vice versa. For server-side events, add your own exporter next to `createDashboardExporter` — any object with `export(events)` works.
+
+## Webhooks (Pro and Enterprise)
+
+Prefer not to touch the relay? Add an HTTPS endpoint under **Settings → Webhooks** in the console. About once a minute, Agentronics POSTs your new events to it, oldest first, up to 200 per request:
+
+```json
+{
+  "type": "events.batch",
+  "timestamp": "2026-10-25T10:00:00.000Z",
+  "data": {
+    "events": [
+      {
+        "id": "evt_…", "site_id": "shop", "session_id": "…", "occurred_at": "…",
+        "type": "tool.executed", "tool": "search_products", "outcome": "success",
+        "agent": { "class": "assistant", "vendor": "openai", "trust": "verified" },
+        "duration_ms": 182, "page": "/search", "protocol": "webmcp", "error": null, "metadata": {}
+      }
+    ]
+  }
+}
+```
+
+Every request is signed with [Standard Webhooks](https://www.standardwebhooks.com/), so any of its libraries can check it. Copy the signing secret (`whsec_…`) from the console:
+
+```ts
+import { Webhook } from 'standardwebhooks'
+
+const wh = new Webhook(process.env.AGENTRONICS_WEBHOOK_SECRET!)
+
+export async function POST(req: Request) {
+  const body = await req.text()
+  const payload = wh.verify(body, Object.fromEntries(req.headers)) // throws if forged or stale
+  await warehouse.insert('agent_events', payload.data.events)
+  return new Response(null, { status: 204 })
+}
+```
+
+- Reply with any 2xx within 10 seconds. Anything else is retried with backoff (2 minutes, doubling, up to 3 hours) from the same point, so nothing is skipped. A retried batch keeps its `webhook-id`; event `id`s are unique, so de-duplicate on those.
+- After 20 failures in a row the endpoint is paused and the console says so. Saving it again resumes delivery.
+- **Send test** in the console sends one signed `webhook.test` request.
+- Endpoints must be public `https://` URLs. Redirects aren't followed.
 
 ## Download raw traces (Enterprise)
 
