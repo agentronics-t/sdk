@@ -68,7 +68,7 @@ describe('SDK ↔ Gateway round-trip', () => {
     const sigs = await signatures.sync()
     expect(sigs[0]?.id).toBe('gpt')
 
-    await exporter.export([
+    exporter.export([
       TraceEvent.parse({
         id: 'trc_int',
         siteId: fixture.orgA.siteId,
@@ -79,6 +79,8 @@ describe('SDK ↔ Gateway round-trip', () => {
         metadata: {},
       }),
     ])
+    // Browser traces are batched; send the queue now.
+    await exporter.flush()
     expect(await fixture.storage.traces.list(fixture.orgA.id)).toHaveLength(1)
 
     const wellKnown = await fetchWellKnownContext({

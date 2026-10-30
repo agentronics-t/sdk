@@ -48,7 +48,7 @@ describe('gateway exporter', () => {
       const exp = createGatewayExporter({ gatewayUrl: 'https://api.agentronics.dev', publishableKey: 'k', fetcher })
       expect(() => exp.export([ev(1)])).not.toThrow()
       await vi.advanceTimersByTimeAsync(2000)
-      expect(() => exp.flush(true)).not.toThrow()
+      await expect(exp.flush(true)).resolves.toBeUndefined()
     }
     const { fetcher, bodies } = fakeFetch()
     const exp = createGatewayExporter({ gatewayUrl: 'https://api.agentronics.dev', publishableKey: 'k', fetcher, maxBatch: 100, maxQueue: 5 })

@@ -14,8 +14,8 @@ export interface GatewayExporterOptions {
 }
 
 export interface GatewayExporter extends TraceExporter {
-  /** Send everything queued now (`keepalive` lets it outlive the page). */
-  flush(keepalive?: boolean): void
+  /** Send everything queued now (`keepalive` lets it outlive the page); settles when the requests do. */
+  flush(keepalive?: boolean): Promise<void>
 }
 
 /**
@@ -38,47 +38,53 @@ export const createGatewayExporter = ({
   let queue: TraceEventRecord[] = []
   let timer: ReturnType<typeof setTimeout> | null = null
 
-  const send = (events: TraceEventRecord[], keepalive: boolean) => {
+  const send = (events: TraceEventRecord[], keepalive: boolean): Promise<void> => {
     const doFetch = fetcher ?? (typeof fetch === 'function' ? fetch : null)
-    if (!doFetch) return
+    if (!doFetch) return Promise.resolve()
     const batch: TraceBatch = { publishableKey, events }
     try {
-      void Promise.resolve(
+      return Promise.resolve(
         doFetch(url, {
           method: 'POST',
           headers: { 'content-type': 'application/json', authorization: `Bearer ${publishableKey}` },
           body: JSON.stringify(batch),
           ...(keepalive ? { keepalive: true } : {}),
         }),
-      ).catch(() => undefined)
+      ).then(
+        () => undefined,
+        () => undefined,
+      )
     } catch {
       /* a fetch that throws synchronously (blocked, polyfilled) loses this batch only */
+      return Promise.resolve()
     }
   }
 
-  const flush = (keepalive = false) => {
+  const flush = (keepalive = false): Promise<void> => {
     if (timer !== null) {
       clearTimeout(timer)
       timer = null
     }
-    while (queue.length) send(queue.splice(0, batchSize), keepalive)
+    const sends: Promise<void>[] = []
+    while (queue.length) sends.push(send(queue.splice(0, batchSize), keepalive))
+    return Promise.all(sends).then(() => undefined)
   }
 
   // Don't lose the last events when the visitor leaves.
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') flush(true)
+      if (document.visibilityState === 'hidden') void flush(true)
     })
   }
-  if (typeof addEventListener === 'function') addEventListener('pagehide', () => flush(true))
+  if (typeof addEventListener === 'function') addEventListener('pagehide', () => void flush(true))
 
   return {
     name: 'gateway',
     export(events: TraceEventRecord[]) {
       queue.push(...events)
       if (queue.length > maxQueue) queue = queue.slice(queue.length - maxQueue)
-      if (queue.length >= batchSize) flush()
-      else if (timer === null) timer = setTimeout(() => flush(), flushMs)
+      if (queue.length >= batchSize) void flush()
+      else if (timer === null) timer = setTimeout(() => void flush(), flushMs)
     },
     flush,
   }
