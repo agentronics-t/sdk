@@ -5,23 +5,81 @@ export interface GatewayExporterOptions {
   gatewayUrl: string
   publishableKey: string
   fetcher?: typeof fetch
+  /** Send queued events this often (ms). Default 2000. */
+  flushMs?: number
+  /** Events per request; the API accepts at most 100. Default 50. */
+  maxBatch?: number
+  /** Events kept while the API is unreachable; the oldest are dropped first. Default 500. */
+  maxQueue?: number
 }
 
+export interface GatewayExporter extends TraceExporter {
+  /** Send everything queued now (`keepalive` lets it outlive the page). */
+  flush(keepalive?: boolean): void
+}
+
+/**
+ * Sends traces to the Agentronics API from the browser. Events are queued and
+ * sent in batches — every couple of seconds, when a batch fills, and when the
+ * page is hidden or closed — rather than one request per event, so a busy page
+ * stays within the API's per-visitor rate limit. Never throws into the page:
+ * a failed send drops that batch.
+ */
 export const createGatewayExporter = ({
   gatewayUrl,
   publishableKey,
-  fetcher = fetch,
-}: GatewayExporterOptions): TraceExporter => ({
-  name: 'gateway',
-  async export(events: TraceEventRecord[]) {
+  fetcher,
+  flushMs = 2000,
+  maxBatch = 50,
+  maxQueue = 500,
+}: GatewayExporterOptions): GatewayExporter => {
+  const url = `${gatewayUrl.replace(/\/$/, '')}/v1/pub/traces`
+  const batchSize = Math.max(1, Math.min(100, maxBatch))
+  let queue: TraceEventRecord[] = []
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  const send = (events: TraceEventRecord[], keepalive: boolean) => {
+    const doFetch = fetcher ?? (typeof fetch === 'function' ? fetch : null)
+    if (!doFetch) return
     const batch: TraceBatch = { publishableKey, events }
-    await fetcher(`${gatewayUrl.replace(/\/$/, '')}/v1/pub/traces`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${publishableKey}`,
-      },
-      body: JSON.stringify(batch),
+    try {
+      void Promise.resolve(
+        doFetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${publishableKey}` },
+          body: JSON.stringify(batch),
+          ...(keepalive ? { keepalive: true } : {}),
+        }),
+      ).catch(() => undefined)
+    } catch {
+      /* a fetch that throws synchronously (blocked, polyfilled) loses this batch only */
+    }
+  }
+
+  const flush = (keepalive = false) => {
+    if (timer !== null) {
+      clearTimeout(timer)
+      timer = null
+    }
+    while (queue.length) send(queue.splice(0, batchSize), keepalive)
+  }
+
+  // Don't lose the last events when the visitor leaves.
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush(true)
     })
-  },
-})
+  }
+  if (typeof addEventListener === 'function') addEventListener('pagehide', () => flush(true))
+
+  return {
+    name: 'gateway',
+    export(events: TraceEventRecord[]) {
+      queue.push(...events)
+      if (queue.length > maxQueue) queue = queue.slice(queue.length - maxQueue)
+      if (queue.length >= batchSize) flush()
+      else if (timer === null) timer = setTimeout(() => flush(), flushMs)
+    },
+    flush,
+  }
+}
