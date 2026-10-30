@@ -49,7 +49,7 @@ describe('key-issuance ↔ SDK ↔ trace-read round-trip', () => {
       publishableKey: issued.publishable.key,
       fetcher: fixture.fetcher,
     })
-    await exporter.export([
+    exporter.export([
       TraceEvent.parse({
         id: 'trc_roundtrip',
         siteId: fixture.orgA.siteId,
@@ -60,6 +60,8 @@ describe('key-issuance ↔ SDK ↔ trace-read round-trip', () => {
         metadata: { source: 'phase-12-test' },
       }),
     ])
+    // Browser traces are batched; send the queue now.
+    await exporter.flush()
 
     // Step 5: dashboard reads the trace back via Clerk session.
     const readRes = await fixture.app.request('/v1/traces?limit=10', {
