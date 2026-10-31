@@ -87,6 +87,11 @@ export interface InitOptions {
    */
   review?: Reviewer | false
   /**
+   * How long an agent's tool call may run before it's aborted and the agent
+   * gets an error back instead of waiting forever. Default 30 000 ms; 0 = no limit.
+   */
+  toolTimeoutMs?: number
+  /**
    * `'0.6'` keeps the pre-0.7 behaviour while you upgrade: unverified tokens
    * count as `verified`, SSO / SPIFFE / mTLS are on, and `review` rules run
    * without asking. Insecure and temporary — see the 0.7 upgrade guide.
@@ -444,6 +449,7 @@ export const init = (options: InitOptions): AgentronicsClient => {
   }
 
   const webmcp = createWebMcpAdapter({
+    ...(options.toolTimeoutMs !== undefined ? { toolTimeoutMs: options.toolTimeoutMs } : {}),
     invoke: async (tool, input, signal) => {
       noteWebMcpCall(tool.name)
       const identity = agentContext.snapshot().identity ?? fallbackWebMcpIdentity

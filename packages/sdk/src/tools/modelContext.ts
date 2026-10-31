@@ -37,7 +37,8 @@ export interface ModelContextTool {
   description: string
   inputSchema?: Record<string, unknown>
   annotations?: ToolAnnotations
-  execute: (input: Record<string, unknown>, options: ToolExecuteOptions) => Promise<unknown>
+  /** Agents and polyfills may leave `options` out. */
+  execute: (input: Record<string, unknown>, options?: ToolExecuteOptions) => Promise<unknown>
 }
 
 export interface RegisterToolOptions {
