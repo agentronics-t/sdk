@@ -31,6 +31,7 @@ const client = Agentronics.init({
 | `policies` | `PolicyRule[]` | `[]` | Authorization rules — usually `pullConfig().policies` from the console. |
 | `toolDescriptions` | `Record<string, string>` | `{}` | Approved descriptions from the console's Memory page; replace the code's text when tools are published. |
 | `review` | `Reviewer \| false` | built-in dialog | Who approves `review` decisions. A function `(request) => Promise<boolean>`, or `false` to refuse them all. |
+| `toolTimeoutMs` | `number` | `30000` | An agent's tool call still running after this long is aborted and the agent gets an error back. `0` = no limit. |
 | `autoDetect` | `boolean \| DetectAgentOptions` | `true` | Run detection on init and attribute tool calls to the detected agent. |
 | `visionDetection` | `boolean \| VisionDetectorOptions` | on with `autoDetect` | Watch interactions for vision-model agents. Reads timing and coordinates only. |
 | `siteMemory` | `Partial<SiteMemory>` | — | Provide site context up-front; equivalent to calling `client.provideSiteMemory(...)` post-init. |
@@ -80,7 +81,7 @@ client.vision?.score()                 // vision-agent score, 0–1
 
 | Import | What it ships | Budget |
 |---|---|---|
-| `@agentronics/sdk` | Full SDK — every pillar wired through `init()`. | ≤ 30 KB brotli (`init` graph ≤ 28 KB) |
+| `@agentronics/sdk` | Full SDK — every pillar wired through `init()`. | ≤ 30 KB brotli (`init` graph ≤ 28.5 KB) |
 | `@agentronics/sdk/lite` | WebMCP-only `init` plus `detectWebMcp`. | ≤ 8 KB brotli |
 | `@agentronics/react` | Provider + hooks. Peer-deps on the SDK. | ≤ 2 KB brotli |
 

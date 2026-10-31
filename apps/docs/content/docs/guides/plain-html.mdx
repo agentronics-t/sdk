@@ -25,6 +25,8 @@ Agentronics ships an IIFE bundle alongside the ESM and CJS builds. Static sites,
 
 The CDN (jsDelivr) serves the same files as `npm install @agentronics/sdk`. Pin an exact version (`0.7.0`) in production: a pinned URL never changes, so browsers cache it for a year.
 
+The examples pin an exact version, which lets you use Subresource Integrity. To get fixes without editing your page, load `@agentronics/sdk@0.7` instead (the latest 0.7.x; no SRI, since the file changes with each patch). Agent Nic installs it that way.
+
 If your site sends a `Content-Security-Policy`, allow `https://cdn.jsdelivr.net` in `script-src` and `https://api.agentronics.dev` in `connect-src`, or the SDK can't load or report.
 
 ## Lite path for WebMCP-only sites

@@ -69,7 +69,7 @@
     {
       "name": "Agentronics.init reachable graph (esm, brotli)",
       "path": "dist/init-only.js",
-      "limit": "28 KB"
+      "limit": "28.5 KB"
     },
     {
       "name": "lite (esm, gzipped)",

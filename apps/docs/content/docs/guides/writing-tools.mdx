@@ -55,6 +55,17 @@ async execute(input, { signal }) {
 }
 ```
 
+## What the SDK adds when your tools go through it
+
+Tools registered through the Agentronics SDK (`client.registerTool`, which is how Agent Nic's code registers them) get a safety layer between the agent and your handler:
+
+- **Any call shape works.** Agents and workbenches call `execute(args)`, `execute(args, { signal })`, or pass the arguments as a JSON string. The handler always gets an object and an `AbortSignal`.
+- **Errors reach the agent as text.** A thrown error, a denied access rule or a refused review comes back as `{ error: "…" }` instead of an exception the agent can't read. Only the agent's own cancellation rejects.
+- **Always a usable result.** `undefined` becomes `{ ok: true }`; a `fetch` `Response` returned by mistake is read for you; values that can't be serialised become text.
+- **No call hangs forever.** After 30 seconds (`toolTimeoutMs`) the call is aborted, your `fetch` gets the abort, and the agent is told it timed out.
+
+Your handlers should still follow the rules above: the SDK keeps a bad handler from crashing the agent, but it can't make a wrong request right.
+
 ## Test before you ship
 
 Call every tool the way an agent would, before it goes live:

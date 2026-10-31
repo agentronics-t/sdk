@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createWebMcpAdapter, type WebMcpProvider } from './webmcpAdapter.js'
+import { callTool, createWebMcpAdapter, type WebMcpProvider } from './webmcpAdapter.js'
 import { __resetWebMcpActivity, lastWebMcpActivity, type ModelContextLike, type ModelContextTool, type RegisterToolOptions } from './modelContext.js'
 import type { GovernedTool } from './registry.js'
 
@@ -51,7 +51,7 @@ describe('webmcp adapter', () => {
 
     const signal = new AbortController().signal
     await expect(registered.get('a')!.tool.execute({ foo: 1 }, { signal })).resolves.toBe('invoked')
-    expect(invoke).toHaveBeenCalledWith(expect.objectContaining({ name: 'a' }), { foo: 1 }, signal)
+    expect(invoke).toHaveBeenCalledWith(expect.objectContaining({ name: 'a' }), { foo: 1 }, expect.any(AbortSignal))
   })
 
   it('reports tools the browser rejects as failed', async () => {
@@ -103,5 +103,64 @@ describe('webmcp adapter', () => {
     const result = adapter.publish([stubTool('a')])
     expect(result.revoked).toBe(false)
     await expect(result.registrations).resolves.toEqual([])
+  })
+
+  it('runs a tool called with only the arguments (no options object), like agent workbenches do', async () => {
+    const { context, registered } = createModelContext()
+    const invoke = vi.fn(async (_tool: GovernedTool, input: unknown, signal?: AbortSignal) => ({ input, hasSignal: signal instanceof AbortSignal }))
+    const adapter = createWebMcpAdapter({ host: { document: { modelContext: context } }, invoke })
+    await adapter.publish([stubTool('search_products')]).registrations
+    const execute = registered.get('search_products')!.tool.execute as (input: unknown) => Promise<unknown>
+    await expect(execute({ q: 'phone' })).resolves.toEqual({ input: { q: 'phone' }, hasSignal: true })
+    await expect(execute(undefined)).resolves.toEqual({ input: {}, hasSignal: true })
+    await expect(execute('{"q":"tv"}')).resolves.toEqual({ input: { q: 'tv' }, hasSignal: true })
+  })
+
+  it('runs legacy provideContext tools through the same safe call', async () => {
+    let tools: Array<{ name: string; invoke(input?: unknown): Promise<unknown> }> = []
+    const provideContext = vi.fn<WebMcpProvider['provideContext']>((payload) => {
+      tools = payload.tools
+      return { revoke: () => undefined }
+    })
+    const adapter = createWebMcpAdapter({ provider: { provideContext }, invoke: async () => { throw new Error('nope') } })
+    await adapter.publish([stubTool('a')]).registrations
+    await expect(tools[0]!.invoke()).resolves.toEqual({ error: 'nope' })
+  })
+})
+
+describe('callTool', () => {
+  it('answers errors (policy denials, tool bugs) as values the agent can read', async () => {
+    await expect(callTool(async () => { throw new Error('This action needs review.') }, {})).resolves.toEqual({ error: 'This action needs review.' })
+    await expect(callTool(() => { throw 'plain' }, {})).resolves.toEqual({ error: 'plain' })
+  })
+
+  it('rethrows only when the agent itself cancelled', async () => {
+    const agent = new AbortController()
+    const call = callTool((_input, signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))), {}, agent.signal)
+    agent.abort()
+    await expect(call).rejects.toThrow('aborted')
+  })
+
+  it('always returns JSON-safe values', async () => {
+    await expect(callTool(async () => undefined, {})).resolves.toEqual({ ok: true })
+    await expect(callTool(async () => new Response('{"items":[1]}', { status: 200 }), {})).resolves.toEqual({ items: [1] })
+    await expect(callTool(async () => new Response('down', { status: 503 }), {})).resolves.toEqual({ error: 'Request failed (503)', detail: 'down' })
+    const circular: Record<string, unknown> = {}
+    circular.self = circular
+    await expect(callTool(async () => circular, {})).resolves.toBe('[object Object]')
+    await expect(callTool(async () => ({ at: 1n }), {})).resolves.toBe('[object Object]')
+  })
+
+  it('aborts a call that never finishes and tells the agent', async () => {
+    vi.useFakeTimers()
+    let aborted = false
+    const call = callTool((_input, signal) => {
+      signal.addEventListener('abort', () => (aborted = true))
+      return new Promise(() => undefined)
+    }, {}, undefined, 1000)
+    await vi.advanceTimersByTimeAsync(1000)
+    await expect(call).resolves.toMatchObject({ error: "The tool didn't finish within 1 s." })
+    expect(aborted).toBe(true)
+    vi.useRealTimers()
   })
 })

@@ -67,6 +67,7 @@ jobs:
         run: pnpm --filter "./packages/*" build
 
       - name: Create release PR or publish
+        id: changesets
         uses: changesets/action@v1
         with:
           # `pnpm version` (no `run`) is reserved by pnpm as the
@@ -80,3 +81,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
+
+      # Sites load the SDK from jsDelivr as @agentronics/sdk@<major.minor> (Agent
+      # Nic installs it that way), so a patch reaches every site without a code
+      # change. jsDelivr caches version ranges for up to a week: purge them now.
+      - name: Refresh the CDN's version-range files
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          range=$(node -p "require('./packages/sdk/package.json').version.split('.').slice(0, 2).join('.')")
+          for f in index.global.js index.js lite.js; do
+            curl -fsS "https://purge.jsdelivr.net/npm/@agentronics/sdk@${range}/dist/${f}" || echo "purge failed for ${f}"
+          done
